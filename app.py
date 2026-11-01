@@ -381,6 +381,50 @@ PURPOSE = {"signup": "تأیید ثبت‌نام", "reset": "بازیابی رم
 
 
 # --- email: Gmail / any SMTP, or Brevo HTTP API (for hosts that block SMTP ports) ---
+def _v4(host, port):
+    return pysocket.getaddrinfo(host, port, pysocket.AF_INET, pysocket.SOCK_STREAM)[0][4][0]
+
+
+class SMTP4(smtplib.SMTP):
+    """SMTP over IPv4 only (hosts like Render can't reach Gmail over IPv6 and the connection just hangs)."""
+    def _get_socket(self, host, port, timeout):
+        return pysocket.create_connection((_v4(host, port), port), timeout)
+
+
+class SMTP4_SSL(smtplib.SMTP_SSL):
+    def _get_socket(self, host, port, timeout):
+        sock = pysocket.create_connection((_v4(host, port), port), timeout)
+        return self.context.wrap_socket(sock, server_hostname=host)
+
+
+_gtoken = {"v": "", "exp": 0}
+
+
+def gmail_api_ready():
+    return bool(env("GMAIL_CLIENT_ID") and env("GMAIL_CLIENT_SECRET") and env("GMAIL_REFRESH_TOKEN"))
+
+
+def _gmail_access_token():
+    if _gtoken["v"] and time.time() < _gtoken["exp"] - 60:
+        return _gtoken["v"]
+    form = urllib.parse.urlencode({"client_id": env("GMAIL_CLIENT_ID"), "client_secret": env("GMAIL_CLIENT_SECRET"),
+                                   "refresh_token": env("GMAIL_REFRESH_TOKEN"), "grant_type": "refresh_token"}).encode()
+    status, out = _http("https://oauth2.googleapis.com/token", form, {"Content-Type": "application/x-www-form-urlencoded"}, "POST")
+    if status != 200:
+        raise RuntimeError(f"token refresh failed {status}: {out[:200]}")
+    d = json.loads(out)
+    _gtoken.update(v=d["access_token"], exp=time.time() + int(d.get("expires_in", 3000)))
+    return _gtoken["v"]
+
+
+def send_gmail_api(msg):
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    status, out = _http("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", json.dumps({"raw": raw}).encode(),
+                        {"Authorization": "Bearer " + _gmail_access_token(), "Content-Type": "application/json"}, "POST")
+    if not 200 <= status < 300:
+        raise RuntimeError(f"gmail send failed {status}: {out[:300]}")
+
+
 def smtp_settings():
     if env("GMAIL_USER") and env("GMAIL_APP_PASSWORD"):
         return "smtp.gmail.com", 587, env("GMAIL_USER"), env("GMAIL_APP_PASSWORD").replace(" ", ""), env("GMAIL_USER")
@@ -391,7 +435,7 @@ def smtp_settings():
 
 
 def email_ready():
-    return bool(smtp_settings() or (env("BREVO_API_KEY") and env("BREVO_SENDER")))
+    return bool(gmail_api_ready() or smtp_settings() or (env("BREVO_API_KEY") and env("BREVO_SENDER")))
 
 
 def send_email(to, code, purpose="signup"):
@@ -423,27 +467,41 @@ def send_email(to, code, purpose="signup"):
             f'<p style="color:#8a8a93;font-size:12.5px;line-height:2.1;margin:0">🔒 این کد را هرگز با کسی در میان نگذارید؛ تیم ChatRoom هیچ‌گاه کد را از شما نمی‌پرسد.<br>'
             f'اگر خودتان این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید؛ هیچ تغییری در حساب شما ایجاد نمی‌شود.</p>{line}'
             f'<p style="color:#6f6f78;font-size:12px;margin:0">با احترام، تیم ChatRoom<br>محمد مهدی آبزن</p></div></div>')
+    sender_addr = env("GMAIL_USER") or env("SMTP_FROM")
+    msg = EmailMessage()
+    msg["Subject"], msg["To"] = subject, to
+    if sender_addr:
+        msg["From"] = f"ChatRoom | محمد مهدی آبزن <{sender_addr}>"
+    msg.set_content(text)
+    msg.add_alternative(html, subtype="html")
+    if gmail_api_ready():
+        try:
+            send_gmail_api(msg)
+            print("[email] sent via Gmail API")
+            return True
+        except Exception as e:
+            print("[email] Gmail API failed:", repr(e))
     cfg = smtp_settings()
     if cfg:
         host, port, user, pwd, sender = cfg
-        try:
-            msg = EmailMessage()
-            msg["Subject"], msg["To"], msg["From"] = subject, to, f"ChatRoom | محمد مهدی آبزن <{sender}>" if sender else ""
-            msg.set_content(text)
-            msg.add_alternative(html, subtype="html")
-            ctx = ssl.create_default_context()
-            if port == 465:
-                with smtplib.SMTP_SSL(host, port, timeout=15, context=ctx) as s:
-                    if user: s.login(user, pwd)
-                    s.send_message(msg)
-            else:
-                with smtplib.SMTP(host, port, timeout=15) as s:
-                    s.ehlo(); s.starttls(context=ctx); s.ehlo()
-                    if user: s.login(user, pwd)
-                    s.send_message(msg)
-            return True
-        except Exception as e:
-            print("[email] SMTP failed:", repr(e))
+        if not msg["From"]:
+            msg["From"] = f"ChatRoom | محمد مهدی آبزن <{sender}>"
+        ctx = ssl.create_default_context()
+        for prt in dict.fromkeys([port, 465, 587]):          # configured port first, then the other standard one
+            try:
+                if prt == 465:
+                    with SMTP4_SSL(host, prt, timeout=12, context=ctx) as srv:
+                        if user: srv.login(user, pwd)
+                        srv.send_message(msg)
+                else:
+                    with SMTP4(host, prt, timeout=12) as srv:
+                        srv.ehlo(); srv.starttls(context=ctx); srv.ehlo()
+                        if user: srv.login(user, pwd)
+                        srv.send_message(msg)
+                print(f"[email] sent via {host}:{prt}")
+                return True
+            except Exception as e:
+                print(f"[email] SMTP {host}:{prt} failed:", repr(e))
     if env("BREVO_API_KEY") and env("BREVO_SENDER"):
         try:
             body = json.dumps({"sender": {"name": "ChatRoom | محمد مهدی آبزن", "email": env("BREVO_SENDER")}, "to": [{"email": to}],
@@ -1385,6 +1443,13 @@ ensure_bot()
 for _n in list(read_json(USERS_FILE, {})):
     onboard_bot_chat(_n)
 
+def _mail_selftest():
+    to = env("MAIL_SELFTEST_TO")
+    if to and email_ready():
+        print("[email] self-test ->", to, "OK" if send_email(to, "123456", "reset") else "FAILED (see errors above)")
+
+
+threading.Thread(target=_mail_selftest, daemon=True).start()
 startup_report()
 
 
