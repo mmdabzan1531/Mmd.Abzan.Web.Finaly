@@ -7,7 +7,7 @@ if os.environ.get("CHATROOM_ASYNC", "").strip() == "gevent" or "gevent" in sys.m
         ASYNC_MODE = "gevent"
     except ImportError:
         print("[async] CHATROOM_ASYNC=gevent but gevent is not installed -> threading mode")
-import base64, json, re, uuid, secrets, threading, random, sqlite3, hashlib, hmac, smtplib, ssl, copy
+import base64, json, re, uuid, secrets, threading, random, sqlite3, hashlib, hmac, smtplib, ssl, copy, mimetypes
 import urllib.request, urllib.parse, urllib.error
 from email.message import EmailMessage
 from collections import defaultdict, deque
@@ -56,8 +56,22 @@ SUPPORT_FILE = os.path.join(DATA_DIR, "support.json")
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_PG = bool(DATABASE_URL)
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
-MAX_IMAGE_SIZE = 4 * 1024 * 1024
+MAX_IMAGE_SIZE = 4 * 1024 * 1024                      # profile photos
+try:
+    MAX_FILE_MB = max(1, int(os.environ.get("CHATROOM_MAX_FILE_MB", "15")))
+except ValueError:
+    MAX_FILE_MB = 15
+MAX_FILE_SIZE = MAX_FILE_MB * 1024 * 1024             # chat attachments (images / files)
 PAGE = 60
+
+# ---------- attachments ----------
+IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
+AUDIO_MIME = {".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".oga": "audio/ogg", ".opus": "audio/ogg", ".wav": "audio/wav",
+              ".m4a": "audio/mp4", ".aac": "audio/aac"}
+VIDEO_MIME = {".mp4": "video/mp4", ".m4v": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime"}
+INLINE_MIME = {**IMAGE_MIME, **AUDIO_MIME, **VIDEO_MIME}      # shown in the browser; everything else is a download
+BLOCKED_EXT = {".html", ".htm", ".xhtml", ".svg", ".js", ".mjs", ".php", ".exe", ".bat", ".cmd", ".scr", ".msi",
+               ".vbs", ".ps1", ".jar", ".dll"}
 
 
 def load_secret():
@@ -80,13 +94,19 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config.update(
     SECRET_KEY=load_secret(),
-    MAX_CONTENT_LENGTH=MAX_IMAGE_SIZE + 1024 * 1024,
+    MAX_CONTENT_LENGTH=MAX_FILE_SIZE + 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=bool(os.environ.get("RENDER_EXTERNAL_HOSTNAME")) or os.environ.get("CHATROOM_HTTPS") == "1",
     PERMANENT_SESSION_LIFETIME=60 * 24 * 3600,  # stay signed in for 60 days
 )
 app.jinja_env.globals["ASSET_V"] = str(int(time.time()))
+
+
+@app.errorhandler(413)
+def too_large(_e):
+    return jsonify(error=f"حجم فایل بیشتر از {MAX_FILE_MB} مگابایت است."), 413
+
 
 # Realtime: Socket.IO behind a proxy (Render, nginx, ...) sees a different Origin/Host
 # than the browser, so a strict origin check rejects the handshake and the chat stays
@@ -221,7 +241,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS media(name TEXT PRIMARY KEY, mime TEXT NOT NULL, data BYTEA NOT NULL)",
             "CREATE TABLE IF NOT EXISTS messages(seq BIGSERIAL PRIMARY KEY, id TEXT UNIQUE NOT NULL, "
             "group_id TEXT NOT NULL, username TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL, "
-            "reply_to TEXT DEFAULT '', edited INTEGER DEFAULT 0, forwarded_from TEXT DEFAULT '')",
+            "reply_to TEXT DEFAULT '', edited INTEGER DEFAULT 0, forwarded_from TEXT DEFAULT '', attach TEXT DEFAULT '')",
+            "ALTER TABLE messages ADD COLUMN IF NOT EXISTS attach TEXT DEFAULT ''",     # upgrade for existing databases
             "CREATE INDEX IF NOT EXISTS idx_group_seq ON messages(group_id, seq)"):
             pg_run(stmt, fetch=False)
         return
@@ -231,7 +252,9 @@ def init_db():
             seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL,
             group_id TEXT NOT NULL, username TEXT NOT NULL, text TEXT NOT NULL,
             created_at TEXT NOT NULL, reply_to TEXT DEFAULT '',
-            edited INTEGER DEFAULT 0, forwarded_from TEXT DEFAULT '')""")
+            edited INTEGER DEFAULT 0, forwarded_from TEXT DEFAULT '', attach TEXT DEFAULT '')""")
+        if "attach" not in [r[1] for r in c.execute("PRAGMA table_info(messages)")]:
+            c.execute("ALTER TABLE messages ADD COLUMN attach TEXT DEFAULT ''")      # upgrade for existing databases
         c.execute("CREATE INDEX IF NOT EXISTS idx_group_seq ON messages(group_id, seq)")
         c.commit()
     old = os.path.join(DATA_DIR, "messages.json")  # one-time import of old history
@@ -261,6 +284,10 @@ def init_data():
         g.setdefault("owner", "")
         g.setdefault("type", "group")
         g.setdefault("invite_code", secrets.token_urlsafe(12))
+        g.setdefault("admins", [])
+        g.setdefault("banned", [])
+        if g["type"] != "dm" and g["owner"] in ("", "system") and g["members"]:
+            g["owner"] = g["members"][0]          # old groups without an owner: the first member becomes owner
     write_json(GROUPS_FILE, groups)
 
 
@@ -273,18 +300,94 @@ if USE_PG and not os.environ.get("CHATROOM_SECRET"):
     app.config["SECRET_KEY"] = _sec["v"]
 
 
+# ---------- attachment helpers ----------
+def _raw_attach(r):
+    try:
+        return r["attach"] or ""
+    except (KeyError, IndexError):
+        return ""
+
+
+def _parse_attach(s):
+    if not s:
+        return None
+    try:
+        d = json.loads(s)
+        return d if isinstance(d, dict) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _preview(text, attach_raw):
+    """Text shown in the chat list: the message, or a label for photos / files."""
+    if text:
+        return text[:60]
+    a = _parse_attach(attach_raw)
+    if a:
+        return {"image": "📷 عکس", "video": "🎞 ویدیو", "audio": "🎵 صوت"}.get(a.get("kind"), "📎 " + str(a.get("name", "فایل")))[:60]
+    return ""
+
+
+def clean_filename(raw):
+    """Keeps Persian / unicode names (werkzeug's secure_filename would strip them)."""
+    name = os.path.basename(str(raw or "").replace("\\", "/"))
+    name = re.sub(r'[\x00-\x1f<>:"|?*]', "", name).strip().strip(".")
+    return name[:100] or "file"
+
+
+def file_ext(name):
+    ext = os.path.splitext(name)[1].lower()
+    return ext if re.fullmatch(r"\.[a-z0-9]{1,8}", ext) else ""
+
+
+def looks_like_image(head):
+    return (head[:8] == b"\x89PNG\r\n\x1a\n" or head[:3] == b"\xff\xd8\xff" or head[:6] in (b"GIF87a", b"GIF89a")
+            or (head[:4] == b"RIFF" and head[8:12] == b"WEBP"))
+
+
+def _disposition(inline, name):
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]", "_", name) or "file"
+    return f"{'inline' if inline else 'attachment'}; filename=\"{ascii_name}\"; filename*=UTF-8''{urllib.parse.quote(name)}"
+
+
+def store_media(stored_name, mime, data):
+    if USE_PG:
+        q("INSERT INTO media(name, mime, data) VALUES(?,?,?)", (stored_name, mime, psycopg2.Binary(data)), commit=True)
+    else:
+        with open(os.path.join(UPLOAD_DIR, stored_name), "wb") as f:
+            f.write(data)
+
+
+def cleanup_media(stored_names):
+    """Delete stored files that no message references any more (forwarded copies share one file)."""
+    for nm in set(n for n in stored_names if n):
+        try:
+            if q("SELECT 1 FROM messages WHERE attach LIKE ? LIMIT 1", ("%" + nm + "%",), one=True):
+                continue
+            if USE_PG:
+                q("DELETE FROM media WHERE name=?", (nm,), commit=True)
+            else:
+                path = os.path.join(UPLOAD_DIR, os.path.basename(nm))
+                if os.path.exists(path):
+                    os.remove(path)
+        except Exception as e:
+            print("[media] cleanup failed:", repr(e))
+
+
 def shape(r, users):
     u = users.get(r["username"], {})
     ru = users.get(r["reply_user"] or "", {})
+    rt = r["reply_text"]
     return {
         "id": r["id"], "seq": r["seq"], "group_id": r["group_id"], "username": r["username"],
         "display_name": u.get("display_name", r["username"]), "avatar": u.get("avatar", "🙂"),
         "avatar_url": u.get("avatar_url", ""), "text": r["text"], "created_at": r["created_at"],
         "edited": bool(r["edited"]), "forwarded_from": r["forwarded_from"] or "",
+        "attach": _parse_attach(_raw_attach(r)),
         "reply_to": r["reply_to"] or "",
-        "reply_text": (r["reply_text"] or "")[:120],
+        "reply_text": ("📎 پیوست" if rt == "" else (rt or ""))[:120],
         "reply_name": ru.get("display_name", r["reply_user"] or ""),
-        "reply_gone": bool(r["reply_to"]) and r["reply_text"] is None,
+        "reply_gone": bool(r["reply_to"]) and rt is None,
     }
 
 
@@ -301,12 +404,15 @@ def fetch_one(mid):
     return (r, shape(r, read_json(USERS_FILE, {}))) if r else (None, None)
 
 
-def insert_message(gid, username, text, reply_to="", forwarded_from=""):
+def insert_message(gid, username, text, reply_to="", forwarded_from="", attach=""):
     mid, now = uuid.uuid4().hex, datetime.now(timezone.utc).isoformat()
-    rows = q("INSERT INTO messages(id,group_id,username,text,created_at,reply_to,forwarded_from) VALUES(?,?,?,?,?,?,?) RETURNING seq",
-             (mid, gid, username, text, now, reply_to, forwarded_from), commit=True)
+    if isinstance(attach, dict):
+        attach = json.dumps(attach, ensure_ascii=False)
+    rows = q("INSERT INTO messages(id,group_id,username,text,created_at,reply_to,forwarded_from,attach) VALUES(?,?,?,?,?,?,?,?) RETURNING seq",
+             (mid, gid, username, text, now, reply_to, forwarded_from, attach or ""), commit=True)
     row = {"id": mid, "seq": rows[0]["seq"], "group_id": gid, "username": username, "text": text, "created_at": now,
-           "edited": 0, "forwarded_from": forwarded_from, "reply_to": reply_to, "reply_text": None, "reply_user": None}
+           "edited": 0, "forwarded_from": forwarded_from, "reply_to": reply_to, "reply_text": None, "reply_user": None,
+           "attach": attach or ""}
     if reply_to:
         parent = q("SELECT text, username FROM messages WHERE id=?", (reply_to,), one=True)
         if parent:
@@ -345,12 +451,12 @@ def is_member(group, username):
 
 def public_group(g):
     return {"name": g.get("name", "گروه"), "description": g.get("description", ""), "members": g.get("members", []),
-            "owner": g.get("owner", ""), "type": g.get("type", "group")}
+            "owner": g.get("owner", ""), "admins": g.get("admins", []), "type": g.get("type", "group")}
 
 
 def last_msg(gid):
-    r = q("SELECT username,text,created_at,seq FROM messages WHERE group_id=? ORDER BY seq DESC LIMIT 1", (gid,), one=True)
-    return {"username": r["username"], "text": r["text"][:60], "created_at": r["created_at"], "seq": r["seq"]} if r else None
+    r = q("SELECT username,text,created_at,seq,attach FROM messages WHERE group_id=? ORDER BY seq DESC LIMIT 1", (gid,), one=True)
+    return {"username": r["username"], "text": _preview(r["text"], r["attach"]), "created_at": r["created_at"], "seq": r["seq"]} if r else None
 
 
 def last_msgs(gids):
@@ -358,10 +464,10 @@ def last_msgs(gids):
     gids = list(gids)
     if not gids:
         return {}
-    rows = q("SELECT m.group_id, m.username, m.text, m.created_at, m.seq FROM messages m JOIN "
+    rows = q("SELECT m.group_id, m.username, m.text, m.created_at, m.seq, m.attach FROM messages m JOIN "
              "(SELECT group_id, MAX(seq) ms FROM messages WHERE group_id IN (" + ",".join("?" * len(gids)) + ") GROUP BY group_id) x "
              "ON x.ms = m.seq", tuple(gids))
-    return {r["group_id"]: {"username": r["username"], "text": r["text"][:60], "created_at": r["created_at"], "seq": r["seq"]} for r in rows}
+    return {r["group_id"]: {"username": r["username"], "text": _preview(r["text"], r["attach"]), "created_at": r["created_at"], "seq": r["seq"]} for r in rows}
 
 
 def my_groups(username):
@@ -736,6 +842,7 @@ def new_code():
 def startup_report():
     print("  async  :", ASYNC_MODE)
     print("\n  storage:", "Postgres (data is permanent)" if USE_PG else "local files (lost on every Render restart!)")
+    print(f"\n  files  : photos & files up to {MAX_FILE_MB} MB")
     print("\n  ---- verification codes ----")
     print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_APP_PASSWORD)")
     print("  sms   :", "READY" if sms_ready() else "NOT configured (set KAVENEGAR_KEY / SMSIR_KEY / TWILIO_*)")
@@ -773,14 +880,14 @@ BOT_ANSWERS = {
     "1": ("🚀 شروع کار\n"
           "۱. از ستون کناری، گفتگوهای خود را می‌بینید؛ برای جستجو، نام گفتگو یا نام کاربری را در کادر بالای ستون بنویسید.\n"
           "۲. با دکمه‌ی «+» یک گروه جدید می‌سازید.\n"
-          "۳. پیام را در کادر پایین بنویسید و دکمه‌ی ➤ را بزنید.\n"
-          "۴. با نگه داشتن یا کلیک روی یک پیام می‌توانید پاسخ بدهید، ویرایش کنید، حذف کنید یا آن را به گفتگوی دیگری بفرستید؛ ویرایش و حذف فقط برای پیام‌های خودتان ممکن است.\n"
+          "۳. پیام را در کادر پایین بنویسید و دکمه‌ی ➤ را بزنید؛ با دکمه‌ی 📎 هم می‌توانید عکس و فایل بفرستید.\n"
+          "۴. با نگه داشتن یا کلیک روی یک پیام می‌توانید پاسخ بدهید، ویرایش کنید، حذف کنید یا آن را به گفتگوی دیگری بفرستید؛ ویرایش و حذف فقط برای پیام‌های خودتان ممکن است (ادمین‌های گروه می‌توانند پیام‌های دیگران را هم حذف کنند).\n"
           "۵. تنظیمات، پشتیبانی و خروج از حساب در پایین ستون کناری قرار دارند."),
     "2": ("👥 ساخت گروه و دعوت دوستان\n"
-          "۱. دکمه‌ی «+» را بزنید، نام و توضیحات گروه را بنویسید و «ساخت گروه» را انتخاب کنید.\n"
+          "۱. دکمه‌ی «+» را بزنید، نام و توضیحات گروه را بنویسید و «ساخت گروه» را انتخاب کنید؛ سازنده‌ی گروه، مالک آن می‌شود.\n"
           "۲. داخل گروه روی «لینک دعوت» بزنید و لینک را برای دوستانتان بفرستید؛ هر کس با آن وارد شود، عضو گروه می‌شود.\n"
           "۳. فهرست اعضا از دکمه‌ی «اعضا» در بالای صفحه نمایش داده می‌شود.\n"
-          "۴. فقط سازنده‌ی گروه می‌تواند نام و توضیحات را از «تنظیمات» گروه تغییر دهد."),
+          "۴. مالک می‌تواند ادمین تعیین کند، مالکیت را منتقل کند یا گروه را حذف کند؛ مالک و ادمین‌ها می‌توانند اعضا را حذف و نام و توضیحات گروه را تغییر دهند."),
     "3": ("💬 پیام خصوصی و جستجوی کاربران\n"
           "۱. نام کاربری یا نام نمایشی فرد را در کادر جستجو بنویسید (حداقل دو حرف).\n"
           "۲. روی نام او بزنید و گزینه‌ی «ارسال پیام» را انتخاب کنید.\n"
@@ -797,7 +904,9 @@ BOT_ANSWERS = {
           "۴. اگر رمز عبورتان را فراموش کردید، از صفحه‌ی ورود گزینه‌ی «رمز خود را فراموش کرده‌اید؟» را انتخاب کنید."),
     "6": ("✨ ویژگی‌های ChatRoom\n"
           "• ارسال و دریافت لحظه‌ای پیام‌ها\n"
+          "• ارسال عکس، ویدیو، صوت و فایل\n"
           "• پیام خصوصی و گروه‌های دعوت‌محور\n"
+          "• مدیریت گروه: مالک، ادمین، حذف عضو و انتقال مالکیت\n"
           "• پاسخ، ویرایش، حذف و فوروارد پیام\n"
           "• نمایش وضعیت آنلاین بودن و در حال نوشتن\n"
           "• ۱۶ تم رنگی و بیش از ۳۰ فونت فارسی\n"
@@ -907,13 +1016,20 @@ def favicon():
 
 @app.route("/media/<path:filename>")
 def media(filename):
+    """Serves avatars and chat attachments. Images / audio / video show inline; everything else is a download."""
+    ext = os.path.splitext(filename)[1].lower()
+    inline_mime = INLINE_MIME.get(ext)
+    dl = clean_filename(request.args.get("n")) if request.args.get("n") else os.path.basename(filename)
+    headers = {"Cache-Control": "public, max-age=2592000", "X-Content-Type-Options": "nosniff",
+               "Content-Disposition": _disposition(bool(inline_mime), dl)}
     if USE_PG:
-        rows = q("SELECT mime, data FROM media WHERE name=?", (filename,))
+        rows = q("SELECT data FROM media WHERE name=?", (filename,))
         if not rows:
             abort(404)
-        return Response(bytes(rows[0]["data"]), mimetype=rows[0]["mime"],
-                        headers={"Cache-Control": "public, max-age=2592000"})
-    return send_from_directory(UPLOAD_DIR, filename, max_age=30 * 24 * 3600)
+        return Response(bytes(rows[0]["data"]), mimetype=inline_mime or "application/octet-stream", headers=headers)
+    resp = send_from_directory(UPLOAD_DIR, filename, mimetype=inline_mime or "application/octet-stream", max_age=30 * 24 * 3600)
+    resp.headers.update(headers)
+    return resp
 
 
 @app.route("/api/me")
@@ -1186,6 +1302,9 @@ def join_invite(invite_code):
         gid, g = match
         if g.get("type") == "dm":
             return redirect(url_for("chat"))
+        if username in g.get("banned", []):
+            flash("دسترسی تو به این گروه مسدود شده است.", "error")
+            return redirect(url_for("chat"))
         if username not in g.setdefault("members", []):
             g["members"].append(username)
             write_json(GROUPS_FILE, groups)
@@ -1220,12 +1339,7 @@ def update_profile():
             if size > MAX_IMAGE_SIZE:
                 return jsonify(error="حجم عکس باید کمتر از ۴ مگابایت باشد."), 400
             filename = f"{uuid.uuid4().hex}{ext}"
-            if USE_PG:
-                mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                        ".webp": "image/webp", ".gif": "image/gif"}[ext]
-                q("INSERT INTO media(name, mime, data) VALUES(?,?,?)", (filename, mime, psycopg2.Binary(photo.read())), commit=True)
-            else:
-                photo.save(os.path.join(UPLOAD_DIR, filename))
+            store_media(filename, IMAGE_MIME[ext], photo.read())
             users[username]["avatar_url"] = "/media/" + filename
         users[username].update(display_name=display_name, bio=bio, avatar=avatar,
                                show_phone=request.form.get("show_phone") == "1", show_email=request.form.get("show_email") == "1")
@@ -1250,7 +1364,7 @@ def create_group():
         groups = read_json(GROUPS_FILE, {})
         gid = uuid.uuid4().hex[:12]
         groups[gid] = {"name": name, "description": desc, "members": [username], "owner": username,
-                       "invite_code": secrets.token_urlsafe(12)}
+                       "admins": [], "banned": [], "type": "group", "invite_code": secrets.token_urlsafe(12)}
         write_json(GROUPS_FILE, groups)
     join_sids(username, gid)
     socketio.emit("groups_snapshot", {"groups": my_groups(username)}, to="user:" + username)
@@ -1269,8 +1383,8 @@ def update_group(group_id):
             return jsonify(error="گروه پیدا نشد یا عضو آن نیستی."), 404
         if g.get("type") == "dm":
             return jsonify(error="گفتگوی خصوصی تنظیمات ندارد."), 400
-        if g.get("owner") not in ("system", username):
-            return jsonify(error="فقط سازنده گروه می‌تواند تنظیمات را تغییر دهد."), 403
+        if not is_admin(g, username):
+            return jsonify(error="فقط مالک یا ادمین گروه می‌تواند تنظیمات را تغییر دهد."), 403
         name = str(p.get("name", "")).strip()[:40]
         desc = str(p.get("description", "")).strip()[:180]
         if not name:
@@ -1385,6 +1499,232 @@ def support_submit():
     return jsonify(ok=True, ticket=ticket)
 
 
+# ---------- group roles: owner > admin > member ----------
+def role_of(g, username):
+    if g.get("type") == "dm":
+        return "member" if username in g.get("members", []) else None
+    if g.get("owner") == username:
+        return "owner"
+    if username in g.get("admins", []):
+        return "admin"
+    return "member" if username in g.get("members", []) else None
+
+
+def is_admin(g, username):
+    return g.get("type") != "dm" and role_of(g, username) in ("owner", "admin")
+
+
+def _err(msg, code=400):
+    return jsonify(error=msg), code
+
+
+def _kick_sids(username, gid):
+    for sid, u in list(online_sids.items()):
+        if u == username:
+            socketio.server.leave_room(sid, gid, namespace="/")
+
+
+def _refresh_user(username):
+    socketio.emit("groups_snapshot", {"groups": my_groups(username)}, to="user:" + username)
+
+
+def _group_updated(gid, g):
+    socketio.emit("group_updated", {"id": gid, "group": public_group(g)}, to=gid)
+
+
+@app.route("/api/group/<group_id>/members")
+@api_login
+def group_members(group_id):
+    me = session["username"]
+    g = valid_group(me, group_id)
+    if not g:
+        return _err("گروه پیدا نشد.", 404)
+    users = read_json(USERS_FILE, {})
+    out = []
+    for n in g["members"]:
+        if n in users:
+            d = safe_user_public(users[n])
+            d["role"] = role_of(g, n)
+            out.append(d)
+    order = {"owner": 0, "admin": 1, "member": 2}
+    out.sort(key=lambda d: order.get(d["role"], 3))
+    return jsonify(ok=True, members=out, my_role=role_of(g, me),
+                   banned=g.get("banned", []) if is_admin(g, me) else [])
+
+
+@app.route("/api/group/<group_id>/kick", methods=["POST"])
+@api_login
+def group_kick(group_id):
+    """مالک/ادمین: حذف عضو. ادمین فقط عضو عادی را می‌تواند حذف کند. body: {username, ban: true}"""
+    me = session["username"]
+    p = request.get_json(silent=True) or {}
+    target = str(p.get("username", ""))
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or not is_admin(g, me):
+            return _err("فقط مالک یا ادمین می‌تواند عضو حذف کند.", 403)
+        if target == me:
+            return _err("برای خروج از گروه از گزینه‌ی «ترک گروه» استفاده کن.")
+        if target not in g["members"]:
+            return _err("این کاربر عضو گروه نیست.", 404)
+        if target == g.get("owner"):
+            return _err("مالک گروه را نمی‌شود حذف کرد.", 403)
+        if target in g.get("admins", []) and role_of(g, me) != "owner":
+            return _err("فقط مالک می‌تواند ادمین را حذف کند.", 403)
+        g["members"].remove(target)
+        if target in g.get("admins", []):
+            g["admins"].remove(target)
+        if bool(p.get("ban", True)) and target not in g.setdefault("banned", []):
+            g["banned"].append(target)       # با لینک دعوت هم نمی‌تواند برگردد
+        write_json(GROUPS_FILE, groups)
+    _kick_sids(target, group_id)
+    socketio.emit("removed_from_group", {"id": group_id}, to="user:" + target)
+    _refresh_user(target)
+    _group_updated(group_id, g)
+    return jsonify(ok=True, group=public_group(g))
+
+
+@app.route("/api/group/<group_id>/unban", methods=["POST"])
+@api_login
+def group_unban(group_id):
+    me = session["username"]
+    target = str((request.get_json(silent=True) or {}).get("username", ""))
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or not is_admin(g, me):
+            return _err("اجازه نداری.", 403)
+        if target in g.get("banned", []):
+            g["banned"].remove(target)
+            write_json(GROUPS_FILE, groups)
+    return jsonify(ok=True)
+
+
+@app.route("/api/group/<group_id>/role", methods=["POST"])
+@api_login
+def group_role(group_id):
+    """فقط مالک: ارتقا به ادمین یا برگشت به عضو عادی. body: {username, role: 'admin'|'member'}"""
+    me = session["username"]
+    p = request.get_json(silent=True) or {}
+    target, role = str(p.get("username", "")), str(p.get("role", ""))
+    if role not in ("admin", "member"):
+        return _err("نقش نامعتبر است.")
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or role_of(g, me) != "owner":
+            return _err("فقط مالک گروه می‌تواند ادمین تعیین کند.", 403)
+        if target not in g["members"] or target == me:
+            return _err("کاربر معتبر نیست.", 404)
+        admins = g.setdefault("admins", [])
+        if role == "admin" and target not in admins:
+            admins.append(target)
+        elif role == "member" and target in admins:
+            admins.remove(target)
+        write_json(GROUPS_FILE, groups)
+    _group_updated(group_id, g)
+    _refresh_user(target)
+    return jsonify(ok=True, group=public_group(g))
+
+
+@app.route("/api/group/<group_id>/transfer", methods=["POST"])
+@api_login
+def group_transfer(group_id):
+    """فقط مالک: انتقال مالکیت. مالک قبلی ادمین می‌شود."""
+    me = session["username"]
+    target = str((request.get_json(silent=True) or {}).get("username", ""))
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or role_of(g, me) != "owner":
+            return _err("فقط مالک گروه می‌تواند مالکیت را منتقل کند.", 403)
+        if target not in g["members"] or target == me:
+            return _err("کاربر معتبر نیست.", 404)
+        g["owner"] = target
+        admins = g.setdefault("admins", [])
+        if target in admins:
+            admins.remove(target)
+        if me not in admins:
+            admins.append(me)
+        write_json(GROUPS_FILE, groups)
+    _group_updated(group_id, g)
+    _refresh_user(me)
+    _refresh_user(target)
+    return jsonify(ok=True, group=public_group(g))
+
+
+def _delete_group_data(group_id):
+    names = [a.get("file") for a in (_parse_attach(r["attach"]) for r in
+             q("SELECT attach FROM messages WHERE group_id=? AND attach<>''", (group_id,))) if a]
+    q("DELETE FROM messages WHERE group_id=?", (group_id,), commit=True)
+    cleanup_media(names)
+
+
+@app.route("/api/group/<group_id>/leave", methods=["POST"])
+@api_login
+def group_leave(group_id):
+    me = session["username"]
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or me not in g.get("members", []) or g.get("type") == "dm":
+            return _err("گروه پیدا نشد.", 404)
+        if g.get("owner") == me and len(g["members"]) > 1:
+            return _err("مالک نمی‌تواند خارج شود؛ اول مالکیت را منتقل کن یا گروه را حذف کن.", 403)
+        if len(g["members"]) <= 1:               # آخرین نفر: گروه پاک می‌شود
+            groups.pop(group_id, None)
+            write_json(GROUPS_FILE, groups)
+            _delete_group_data(group_id)
+            _kick_sids(me, group_id)
+            _refresh_user(me)
+            return jsonify(ok=True, deleted=True)
+        g["members"].remove(me)
+        if me in g.get("admins", []):
+            g["admins"].remove(me)
+        write_json(GROUPS_FILE, groups)
+    _kick_sids(me, group_id)
+    _refresh_user(me)
+    _group_updated(group_id, g)
+    return jsonify(ok=True)
+
+
+@app.route("/api/group/<group_id>/delete", methods=["POST"])
+@api_login
+def group_delete(group_id):
+    """فقط مالک: حذف کامل گروه و همه‌ی پیام‌ها و فایل‌هایش."""
+    me = session["username"]
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or g.get("type") == "dm" or role_of(g, me) != "owner":
+            return _err("فقط مالک گروه می‌تواند آن را حذف کند.", 403)
+        members = list(g["members"])
+        groups.pop(group_id)
+        write_json(GROUPS_FILE, groups)
+        _delete_group_data(group_id)
+    socketio.emit("group_deleted", {"id": group_id}, to=group_id)
+    for n in members:
+        _kick_sids(n, group_id)
+        _refresh_user(n)
+    return jsonify(ok=True)
+
+
+@app.route("/api/group/<group_id>/invite/reset", methods=["POST"])
+@api_login
+def group_invite_reset(group_id):
+    """مالک/ادمین: لینک دعوت قبلی باطل و لینک جدید ساخته می‌شود."""
+    me = session["username"]
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or not is_admin(g, me):
+            return _err("اجازه نداری.", 403)
+        g["invite_code"] = secrets.token_urlsafe(12)
+        write_json(GROUPS_FILE, groups)
+    return jsonify(ok=True, invite_url=request.url_root.rstrip("/") + "/join/" + g["invite_code"])
+
+
 # ---------- realtime ----------
 def valid_group(username, gid):
     g = read_json(GROUPS_FILE, {}).get(gid)
@@ -1454,11 +1794,11 @@ def on_load_older(data):
 sent_cids = {}   # (username, client id) -> (message, time): makes retries idempotent (no duplicate messages)
 
 
-def deliver_message(username, gid, text, reply_to="", cid=""):
-    """Single code path for sending (Socket.IO and the HTTP fallback). Returns (message, error)."""
+def deliver_message(username, gid, text, reply_to="", cid="", attach=None):
+    """Single code path for sending (Socket.IO, HTTP fallback and file upload). Returns (message, error)."""
     text, cid = str(text or "").strip()[:1000], str(cid or "")[:40]
     g = valid_group(username, gid) if username else None
-    if not g or not text:
+    if not g or (not text and not attach):
         return None, "ارسال پیام ممکن نیست."
     hit = sent_cids.get((username, cid)) if cid else None
     if hit:
@@ -1468,7 +1808,7 @@ def deliver_message(username, gid, text, reply_to="", cid=""):
     reply_to = str(reply_to or "")[:50]
     if reply_to and not q("SELECT 1 FROM messages WHERE id=? AND group_id=?", (reply_to, gid), one=True):
         reply_to = ""
-    m = insert_message(gid, username, text, reply_to=reply_to)
+    m = insert_message(gid, username, text, reply_to=reply_to, attach=attach or "")
     m["cid"] = cid
     if cid:
         now = time.time()
@@ -1480,7 +1820,7 @@ def deliver_message(username, gid, text, reply_to="", cid=""):
         for n in g["members"]:  # first message: the DM now appears in the other person's list
             socketio.emit("groups_snapshot", {"groups": my_groups(n), "users": visible_users(n)}, to="user:" + n)
     socketio.emit("new_message", m, to=gid)
-    if g.get("type") == "dm" and BOT_USER in g.get("members", []) and username != BOT_USER:
+    if g.get("type") == "dm" and BOT_USER in g.get("members", []) and username != BOT_USER and text:
         threading.Timer(0.6, bot_respond, (gid, text)).start()
     return m, ""
 
@@ -1516,6 +1856,46 @@ def api_messages():
     return jsonify(ok=True, messages=msgs, has_more=more, group=public_group(g))
 
 
+@app.route("/api/upload", methods=["POST"])
+@api_login
+def api_upload():
+    """Send a photo / video / audio / file. multipart form: file, group_id, text (caption), reply_to, cid."""
+    username = session["username"]
+    gid = str(request.form.get("group_id", ""))
+    if not valid_group(username, gid):
+        return _err("گروه پیدا نشد.", 404)
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return _err("فایلی انتخاب نشده است.")
+    if not rate_ok("upload:" + username, 10, 60):
+        return _err("کمی آهسته‌تر؛ فایل‌ها پشت‌سرهم ارسال می‌شوند.", 429)
+    data = f.read(MAX_FILE_SIZE + 1)
+    if len(data) > MAX_FILE_SIZE:
+        return _err(f"حجم فایل بیشتر از {MAX_FILE_MB} مگابایت است.", 413)
+    if not data:
+        return _err("فایل خالی است.")
+    name = clean_filename(f.filename)
+    ext = file_ext(name)
+    if ext in BLOCKED_EXT:
+        return _err("ارسال این نوع فایل مجاز نیست.")
+    kind = "image" if ext in IMAGE_MIME else "audio" if ext in AUDIO_MIME else "video" if ext in VIDEO_MIME else "file"
+    if kind == "image" and not looks_like_image(data[:16]):
+        return _err("فایل تصویر معتبر نیست.")
+    mime = INLINE_MIME.get(ext) or mimetypes.guess_type(name)[0] or "application/octet-stream"
+    stored = uuid.uuid4().hex + ext
+    store_media(stored, mime, data)
+    attach = {"file": stored, "name": name, "mime": mime, "size": len(data), "kind": kind,
+              "url": "/media/" + stored + "?n=" + urllib.parse.quote(name)}
+    m, err = deliver_message(username, gid, request.form.get("text", ""), request.form.get("reply_to", ""),
+                             request.form.get("cid", ""), attach=json.dumps(attach, ensure_ascii=False))
+    if not m:
+        cleanup_media([stored])
+        return _err(err, 429 if "آهسته" in err else 400)
+    if (m.get("attach") or {}).get("file") != stored:      # a retry with the same cid: the first copy already exists
+        cleanup_media([stored])
+    return jsonify(ok=True, id=m["id"], message=m)
+
+
 @socketio.on("typing")
 def on_typing(data):
     username = session.get("username")
@@ -1549,10 +1929,15 @@ def on_delete_message(data):
     if not username:
         return
     row, _ = fetch_one(mid)
-    if not row or row["username"] != username or not valid_group(username, row["group_id"]):
+    g = valid_group(username, row["group_id"]) if row else None
+    # صاحب پیام، یا مالک/ادمین گروه می‌تواند پیام را پاک کند
+    if not row or not g or (row["username"] != username and not is_admin(g, username)):
         emit("action_error", {"error": "اجازه حذف این پیام را نداری."})
         return
+    a = _parse_attach(_raw_attach(row))
     q("DELETE FROM messages WHERE id=?", (mid,), commit=True)
+    if a:
+        cleanup_media([a.get("file")])
     emit("message_deleted", {"id": mid, "group_id": row["group_id"]}, to=row["group_id"])
 
 
@@ -1568,7 +1953,7 @@ def on_forward_message(data):
     row, shaped = fetch_one(mid)
     if not row or not valid_group(username, row["group_id"]):
         return
-    m = insert_message(target, username, row["text"], forwarded_from=shaped["display_name"])
+    m = insert_message(target, username, row["text"], forwarded_from=shaped["display_name"], attach=_raw_attach(row))
     emit("new_message", m, to=target)
 
 
