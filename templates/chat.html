@@ -7,8 +7,8 @@
     <div class="side-head"><div class="brand"><svg class="mark"><use href="#star"/></svg><span>Chatroom</span></div><div class="side-tools"><button class="key small" data-install-btn hidden>نصب</button><button class="key round small hot" id="open-create-group" title="گروه جدید" aria-label="گروه جدید">+</button><button class="key round small mobile-only" id="close-sidebar" aria-label="بستن">✕</button></div></div>
     <div class="searchbox"><input id="chat-search" placeholder="جستجوی گفتگو یا نام کاربری…" autocomplete="off" aria-label="جستجو"></div>
     <nav id="group-list" class="group-list"></nav>
-    <div class="me" id="open-profile" role="button" tabindex="0"><div class="avatar" id="my-avatar">{% if current_user.avatar_url %}<img src="{{ current_user.avatar_url }}" alt="">{% else %}{{ current_user.avatar }}{% endif %}</div><div class="me-info"><strong id="my-display">{{ current_user.display_name }}</strong><span>@{{ current_user.username }}</span></div></div>
-    <div class="side-nav"><button type="button" id="open-settings"><i>⚙</i>تنظیمات</button><a href="/about#about"><i>ℹ</i>درباره ما</a><a href="/support#support"><i>🛟</i>پشتیبانی</a><a href="{{ url_for('logout') }}"><i>⎋</i>خروج</a></div>
+    <div class="me" id="open-profile" role="button" tabindex="0"><div class="avatar" id="my-avatar">{% if current_user.avatar_url %}<img src="{{ current_user.avatar_url }}" alt="">{% else %}{{ current_user.avatar }}{% endif %}</div><div class="me-info"><strong id="my-display" data-no-i18n>{{ current_user.display_name }}</strong><span>@{{ current_user.username }}</span></div></div>
+    <div class="side-nav"><button type="button" id="open-settings"><i>⚙</i>تنظیمات</button><a href="/lang?next=/chat"><i>🌐</i>زبان</a><a href="/about#about"><i>ℹ</i>درباره ما</a><a href="/support#support"><i>🛟</i>پشتیبانی</a><a href="{{ url_for('logout') }}"><i>⎋</i>خروج</a></div>
     <span id="online-count" hidden>0</span>
   </aside>
   <main class="room">
@@ -45,7 +45,7 @@
   <label>شماره و ایمیل ثبت‌شده</label><div class="contact"><div><b>موبایل:</b><span dir="ltr">{{ current_user.phone or "—" }}</span></div><div><b>ایمیل:</b><span dir="ltr">{{ current_user.email or "—" }}</span></div></div>
   <div class="row2"><input type="checkbox" id="profile-show-phone" {{ "checked" if current_user.show_phone }}><label for="profile-show-phone">نمایش شماره در پروفایل</label></div>
   <div class="row2"><input type="checkbox" id="profile-show-email" {{ "checked" if current_user.show_email }}><label for="profile-show-email">نمایش ایمیل در پروفایل</label></div>
-  <div class="row2"><button type="button" class="key small" id="theme-open">🎨 تم‌ها</button><button type="button" class="key small" id="font-open">🔤 فونت‌ها</button></div>
+  <div class="row2"><button type="button" class="key small" id="theme-open">🎨 تم‌ها</button><button type="button" class="key small" id="font-open">🔤 فونت‌ها</button><a class="key small" href="/lang?next=/chat">🌐 زبان</a></div>
   <div class="row2"><a class="key small" href="/support#support">🛟 پشتیبانی</a><a class="key small" href="/about#about">ℹ درباره ما</a></div>
   <div class="actions"><button class="key" data-close="profile-modal">بستن</button><button class="key hot" id="save-profile">ذخیره</button></div><p class="status" id="profile-status"></p></section></div>
 <div class="modal" id="user-view-modal"><section class="card center"><div class="avatar xl" id="view-user-avatar">🙂</div><h2 id="view-user-name"></h2><p class="handle" id="view-user-id"></p><p class="bio" id="view-user-bio"></p><div class="contact" id="view-contact"></div><div class="actions"><button class="key" data-close="user-view-modal">بستن</button><button class="key hot" id="view-dm">ارسال پیام</button></div></section></div>
