@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head>{% include "_head.html" %}<title>ثبت‌نام | Chatroom</title></head>
+<body class="auth-body">
+{% include "_star.html" %}
+<div class="ig">
+<main class="ig-main">
+  <section class="ig-card" id="step-form">
+    <div class="ig-brand"><svg class="mark"><use href="#star"/></svg><h1>Chatroom</h1></div>
+    <p class="ig-lead">ثبت‌نام کن و با دوستانت خصوصی یا گروهی گفتگو کن.</p>
+    <div id="msg" class="ig-note" role="alert" hidden></div>
+    <form id="su-form" class="ig-form" data-gate autocomplete="on" novalidate>
+      <div class="fl"><input id="su-contact" name="contact" dir="auto" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder=" " required><label for="su-contact">شماره موبایل یا ایمیل</label></div>
+      <div class="fl"><input id="su-name" name="name" maxlength="32" autocomplete="name" placeholder=" " required><label for="su-name">نام کامل</label></div>
+      <div class="fl"><input id="su-user" name="username" dir="ltr" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder=" " required><label for="su-user">نام کاربری (انگلیسی)</label></div>
+      <div class="fl has-eye"><input id="su-pass" name="password" type="password" dir="auto" minlength="8" autocomplete="new-password" placeholder=" " required><label for="su-pass">رمز عبور (حداقل ۸ کاراکتر)</label><button type="button" class="eye" data-eye="su-pass" hidden>نمایش</button></div>
+      <div class="fl"><input id="su-cap" name="captcha" inputmode="numeric" autocomplete="off" placeholder=" " required><label for="su-cap" id="su-cap-q">{{ captcha_question }}</label></div>
+      <p class="ig-legal">اگر شماره موبایل وارد کنی کد با پیامک می‌آید و اگر ایمیل وارد کنی، کد به ایمیلت ارسال می‌شود.<br>با ثبت‌نام، <a href="/terms">قوانین</a> و <a href="/privacy">حریم خصوصی</a> را می‌پذیری.</p>
+      <button class="ig-btn" type="submit" id="su-submit">ثبت‌نام</button>
+    </form>
+  </section>
+  <section class="ig-card" id="step-code" hidden>
+    <div class="ig-ico" id="code-ico">✉</div>
+    <h2>کد تأیید را وارد کن</h2>
+    <p class="ig-sub" id="code-info"></p>
+    <div id="msg2" class="ig-note" role="alert" hidden></div>
+    <form id="code-form" class="ig-form" autocomplete="off">
+      <div class="fl code"><input id="su-code" inputmode="numeric" pattern="[0-9۰-۹]{6}" maxlength="6" autocomplete="one-time-code" placeholder=" " required><label for="su-code">کد ۶ رقمی</label></div>
+      <div id="devcode" class="devcode" hidden></div>
+      <button class="ig-btn" type="submit" id="code-submit" disabled>تأیید و ساخت حساب</button>
+    </form>
+    <div class="ig-links"><button type="button" class="ig-text-btn" id="resend">ارسال دوباره کد</button><button type="button" class="ig-text-btn" id="back">ویرایش اطلاعات</button></div>
+  </section>
+  <section class="ig-card slim">حساب دارید؟ <a href="/">ورود</a></section>
+  <section class="ig-get">برنامه را نصب کنید.<button type="button" class="ig-btn" data-install-btn hidden>نصب Chatroom</button></section>
+</main>
+{% include "_footer.html" %}
+</div>
+<script src="{{ url_for('static', filename='auth.js') }}?v={{ ASSET_V }}"></script><script src="{{ url_for('static', filename='pwa.js') }}?v={{ ASSET_V }}"></script>
+</body></html>

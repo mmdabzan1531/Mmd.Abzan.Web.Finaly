@@ -1,0 +1,56 @@
+/* ===== auth.css: Instagram-style login / signup / forgot / legal pages (uses theme variables) ===== */
+.ig{min-height:100dvh;display:flex;flex-direction:column;align-items:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.ig-main{width:100%;max-width:370px;display:grid;gap:12px;margin-block:auto;padding-block:8px}
+.ig-card{background:var(--deck);border:1px solid var(--line);border-radius:16px;padding:28px 30px}
+.ig-card.slim{padding:18px 20px;text-align:center;font-size:14px}
+.ig-card.slim a,.ig-card a.strong{color:var(--aril);font-weight:700;text-decoration:none}
+html[data-theme=noir] .ig-card.slim a,html[data-theme=noir] .ig-card a.strong{color:var(--melon)}
+.ig-brand{display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:16px;text-align:center}
+.ig-brand .mark{width:44px;height:44px}
+.ig-brand h1{font:400 46px/1.15 var(--display);letter-spacing:.01em}
+.ig-brand .owner{font:400 17px/1.4 var(--display)}
+.ig-lead{text-align:center;color:var(--mute);font-weight:700;font-size:15px;line-height:1.9;margin:-4px 0 14px}
+.ig-card h2{font:700 18px/1.6 var(--font);text-align:center;margin-bottom:6px}
+.ig-card p.ig-sub{color:var(--mute);font-size:13.5px;line-height:2;text-align:center;margin-bottom:12px}
+.ig-ico{width:76px;height:76px;margin:0 auto 12px;border:2px solid var(--ink);border-radius:50%;display:grid;place-items:center;font-size:34px}
+.ig-form{display:grid;gap:8px}
+.fl{position:relative}
+.fl input{height:50px;padding:21px 13px 6px;border-radius:10px;background:var(--night);border:1px solid var(--line);font-size:15px;text-align:start}
+.fl input::placeholder{color:transparent}
+.fl label{position:absolute;inset-inline-start:13px;top:15px;margin:0;font-size:14px;color:var(--mute);pointer-events:none;transition:top .12s,font-size .12s;background:none}
+.fl input:focus+label,.fl input:not(:placeholder-shown)+label{top:6px;font-size:11px}
+.fl input:focus{border-color:var(--mute)}
+.fl .eye{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);padding:6px 8px;font-size:13px;font-weight:700;color:var(--ink);border-radius:8px}
+.fl .eye[hidden]{display:none}
+.fl.has-eye input{padding-inline-end:62px}
+.ig-btn{width:100%;height:42px;margin-top:6px;border-radius:12px;background:var(--aril);color:var(--on-aril);font-weight:700;font-size:15px;transition:filter .15s,transform .07s}
+.ig-btn:hover:not(:disabled){filter:brightness(1.1)}
+.ig-btn:active:not(:disabled){transform:scale(.98)}
+.ig-btn:disabled{opacity:.45;cursor:default}
+.ig-or{display:flex;align-items:center;gap:14px;margin:16px 0 4px;color:var(--mute);font-size:13px;font-weight:700}
+.ig-or:before,.ig-or:after{content:"";flex:1;height:1px;background:var(--line)}
+.ig-links{display:grid;gap:12px;justify-items:center;margin-top:12px;font-size:13px}
+.ig-links a,.ig-text-btn{color:var(--mute);text-decoration:none;background:none;font-size:13px;font-weight:500}
+.ig-links a:hover,.ig-text-btn:hover:not(:disabled){color:var(--ink)}
+.ig-text-btn:disabled{opacity:.6;cursor:default}
+.ig-legal{color:var(--mute);font-size:12px;line-height:2;text-align:center;margin-top:10px}
+.ig-legal a{color:var(--ink);text-decoration:none;font-weight:700}
+.ig-note{margin:0 0 10px;padding:9px 12px;border-radius:10px;font-size:13.5px;line-height:1.9;text-align:center;background:rgba(229,56,94,.14);border:1px solid rgba(229,56,94,.55)}
+.ig-note.ok{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.5)}
+.ig-note[hidden]{display:none}
+.ig-get{display:none;text-align:center;font-size:14px}
+.ig-get:has([data-install-btn]:not([hidden])){display:grid;gap:8px}
+.ig-foot{width:100%;max-width:760px;margin-top:22px;display:grid;gap:12px;justify-items:center;color:var(--mute);font-size:12.5px}
+.ig-foot nav{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px}
+.ig-foot a{color:var(--mute);text-decoration:none}.ig-foot a:hover{color:var(--ink)}
+.ig-foot .tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.ig-foot .tools button{padding:5px 14px;border:1px solid var(--line);border-radius:99px;color:var(--mute);font-size:12.5px}
+.ig-foot .tools button:hover{color:var(--ink);border-color:var(--mute)}
+.devcode{margin-top:8px;padding:9px 12px;border-radius:12px;border:1px dashed var(--pista);color:var(--pista);font-size:13px;text-align:center}
+.fl.code input{letter-spacing:.5em;text-align:center;font-size:22px;direction:ltr;padding-top:6px}
+.fl.code label{inset-inline-start:0;inset-inline-end:0;text-align:center;top:15px}
+.fl.code input:focus+label,.fl.code input:not(:placeholder-shown)+label{opacity:0}
+.legal{max-width:760px;width:100%;margin:0 auto;display:grid;gap:14px;line-height:2.05}
+.legal h2{font:700 19px var(--font);margin-top:10px}
+.legal p,.legal li{color:var(--mute);font-size:14.5px}.legal ul{padding-inline-start:20px}
+@media(max-width:420px){.ig-card{padding:24px 18px}}

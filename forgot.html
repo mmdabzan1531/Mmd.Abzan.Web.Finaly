@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head>{% include "_head.html" %}<title>بازیابی رمز عبور | Chatroom</title></head>
+<body class="auth-body">
+{% include "_star.html" %}
+<div class="ig">
+<main class="ig-main">
+  <section class="ig-card" id="step-find">
+    <div class="ig-ico">🔒</div>
+    <h2>مشکل در ورود دارید؟</h2>
+    <p class="ig-sub">نام کاربری، ایمیل یا شماره موبایلت را وارد کن تا کد بازیابی رمز را برایت بفرستیم.</p>
+    <div id="msg" class="ig-note" role="alert" hidden></div>
+    <form id="fg-form" class="ig-form" data-gate autocomplete="on">
+      <div class="fl"><input id="fg-id" dir="auto" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder=" " required minlength="3"><label for="fg-id">نام کاربری، ایمیل یا شماره موبایل</label></div>
+      <div class="fl"><input id="fg-cap" inputmode="numeric" autocomplete="off" placeholder=" " required><label for="fg-cap" id="fg-cap-q">{{ captcha_question }}</label></div>
+      <button class="ig-btn" type="submit">ارسال کد</button>
+    </form>
+    <div class="ig-or">یا</div>
+    <div class="ig-links"><a class="strong" href="/signup" style="color:var(--ink);font-weight:700">ایجاد حساب جدید</a></div>
+  </section>
+  <section class="ig-card" id="step-reset" hidden>
+    <div class="ig-ico">✉</div>
+    <h2>رمز جدید را تنظیم کن</h2>
+    <p class="ig-sub" id="reset-info">اگر حسابی با این مشخصات باشد، کد ۶ رقمی برایش ارسال شد. کد را با رمز جدید وارد کن.</p>
+    <div id="msg2" class="ig-note" role="alert" hidden></div>
+    <form id="rs-form" class="ig-form" data-gate autocomplete="off">
+      <div class="fl code"><input id="rs-code" inputmode="numeric" pattern="[0-9۰-۹]{6}" maxlength="6" autocomplete="one-time-code" placeholder=" " required><label for="rs-code">کد ۶ رقمی</label></div>
+      <div class="fl has-eye"><input id="rs-pass" type="password" dir="auto" minlength="8" autocomplete="new-password" placeholder=" " required><label for="rs-pass">رمز جدید (حداقل ۸ کاراکتر)</label><button type="button" class="eye" data-eye="rs-pass" hidden>نمایش</button></div>
+      <div id="devcode" class="devcode" hidden></div>
+      <button class="ig-btn" type="submit">تغییر رمز و ورود</button>
+    </form>
+    <div class="ig-links"><button type="button" class="ig-text-btn" id="resend">ارسال دوباره کد</button><button type="button" class="ig-text-btn" id="back">تغییر مشخصات</button></div>
+  </section>
+  <section class="ig-card slim"><a href="/">بازگشت به ورود</a></section>
+</main>
+{% include "_footer.html" %}
+</div>
+<script src="{{ url_for('static', filename='auth.js') }}?v={{ ASSET_V }}"></script><script src="{{ url_for('static', filename='pwa.js') }}?v={{ ASSET_V }}"></script>
+</body></html>

@@ -1,0 +1,11 @@
+services:
+  chatroom:
+    build: .
+    ports: ["8000:8000"]
+    env_file: [.env]          # copy .env.example to .env and fill it in
+    environment:
+      CHATROOM_SECRET: ${CHATROOM_SECRET:-change-me-to-a-long-random-string}
+    volumes: ["chatroom-data:/data"]
+    restart: unless-stopped
+volumes:
+  chatroom-data:

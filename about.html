@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head>{% include "_head.html" %}<title>درباره ما و پشتیبانی | Chatroom</title></head>
+<body class="auth-body">
+{% include "_star.html" %}
+<div class="ig">
+<main class="page">
+  <div class="top"><a href="{{ '/chat' if logged else '/' }}">← {{ 'بازگشت به گفتگوها' if logged else 'ورود / ثبت‌نام' }}</a><button class="key small round" data-theme-btn aria-label="تم">◐</button></div>
+  <header style="text-align:center"><svg class="mark"><use href="#star"/></svg><h1>Chatroom</h1><p class="owner">محمد مهدی آبزن</p></header>
+  <section class="sect" id="about"><h2>درباره ما</h2>
+    <p>Chatroom یک پیام‌رسان فارسی‌زبان، سریع و کم‌حجم است که با عشق و وسواس ساخته شده تا گفتگوهایت همیشه روان، خصوصی و منظم بماند. پیام خصوصی، گروه‌های دعوت‌محور، پروفایل شخصی‌سازی‌شده، ۱۶ تم رنگی و بیش از ۳۰ فونت فارسی؛ همه در یک برنامه‌ی سبک که روی موبایل و کامپیوتر نصب می‌شود.</p>
+    <div class="grid3"><div><b>⚡ سرعت</b>ارسال و دریافت لحظه‌ای پیام‌ها</div><div><b>🔒 حریم خصوصی</b>شماره و ایمیلت فقط وقتی نمایش داده می‌شود که خودت بخواهی</div><div><b>🎨 شخصی‌سازی</b>تم‌ها و فونت‌های فارسی متنوع برای هر سلیقه</div></div>
+  </section>
+  <section class="sect" id="contact"><h2>تماس با ما</h2>
+    <div class="contact"><div><b>تلفن:</b><span dir="ltr">{{ SITE.tel }}</span></div><div><b>موبایل:</b><span dir="ltr">{{ SITE.phone }}</span></div><div><b>ایمیل:</b><span dir="ltr">{{ SITE.email }}</span></div><div><b>آدرس:</b>{{ SITE.address }}</div></div>
+  </section>
+  <section class="sect" id="support"><h2>پشتیبانی</h2>
+    <details><summary>کد تأیید نمی‌رسد، چه کنم؟</summary><p>۳۰ ثانیه صبر کن و «ارسال دوباره کد» را بزن. اگر با ایمیل ثبت‌نام کرده‌ای پوشه‌ی اسپم را هم ببین؛ اگر با شماره‌ات ثبت‌نام کرده‌ای مطمئن شو شماره درست است.</p></details>
+    <details><summary>رمز عبورم را فراموش کرده‌ام</summary><p>در صفحه‌ی ورود روی «رمز خود را فراموش کرده‌اید؟» بزن یا <a href="/forgot" style="color:var(--melon)">همین‌جا</a> کد بازیابی بگیر.</p></details>
+    <details><summary>چطور شماره‌ام در پروفایل نمایش داده شود؟</summary><p>تنظیمات ← «نمایش شماره در پروفایل» را روشن کن.</p></details>
+    <details><summary>چطور تم یا فونت را عوض کنم؟</summary><p>در تنظیمات، دکمه‌های «تم» و «فونت» را بزن؛ در صفحه‌ی ورود هم پایین صفحه همین دکمه‌ها هست.</p></details>
+    <h2 style="margin-top:16px">ارسال درخواست</h2>
+    <div id="sp-msg" class="notice success" hidden></div>
+    <form id="sp-form"><label>موضوع</label><input id="sp-sub" maxlength="80"><label>راه تماس (ایمیل یا شماره)</label><input id="sp-con" maxlength="120"><label>پیام شما</label><textarea id="sp-text" rows="4" maxlength="1500" required></textarea><button class="key hot wide" type="submit">ارسال به پشتیبانی</button></form>
+  </section>
+</main>
+{% include "_footer.html" %}
+</div>
+<script>
+document.getElementById('sp-form').addEventListener('submit',async e=>{e.preventDefault();const m=document.getElementById('sp-msg');
+ try{const r=await fetch('/api/support',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject:sp_sub.value,contact:sp_con.value,message:sp_text.value})});const d=await r.json();if(!r.ok)throw new Error(d.error);
+ m.className='notice success';m.textContent='درخواستت ثبت شد. کد پیگیری: '+d.ticket;e.target.reset()}catch(x){m.className='notice';m.textContent=x.message}m.hidden=false});
+</script></body></html>

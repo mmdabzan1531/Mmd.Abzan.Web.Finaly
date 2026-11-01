@@ -1,0 +1,25 @@
+/* ===== themes.css: extra themes (noir/yalda/sobh/firouzeh live in extra.css/style.css) ===== */
+html[data-theme=shab]{color-scheme:dark;--night:#0a1224;--deck:#0f1a33;--raise:#172647;--line:#243659;--ink:#e8eefc;--mute:#8fa1c7;--aril:#3b82f6;--aril-d:#1d4ed8;--on-aril:#fff;--melon:#93c5fd;--pista:#34d399;--on-pista:#04130d;--edge-c:#050a16;--tile:none}
+html[data-theme=jangal]{color-scheme:dark;--night:#07120d;--deck:#0c1c14;--raise:#14291e;--line:#1f3b2c;--ink:#e9f5ec;--mute:#8db39a;--aril:#22a45d;--aril-d:#146b3a;--on-aril:#fff;--melon:#86efac;--pista:#fde68a;--on-pista:#1c1500;--edge-c:#040a07;--tile:none}
+html[data-theme=ghoroob]{color-scheme:dark;--night:#1a0f14;--deck:#25151c;--raise:#351e29;--line:#4d2c3b;--ink:#fdeee8;--mute:#c79aa3;--aril:#e5541b;--aril-d:#a53a0e;--on-aril:#fff;--melon:#ffb38a;--pista:#ffd166;--on-pista:#2a1b00;--edge-c:#0e0709;--tile:none}
+html[data-theme=arghavan]{color-scheme:dark;--night:#130a1f;--deck:#1b1029;--raise:#281a3d;--line:#3b2859;--ink:#f6ecff;--mute:#b79ad6;--aril:#c026d3;--aril-d:#86198f;--on-aril:#fff;--melon:#f0abfc;--pista:#a3e635;--on-pista:#121a00;--edge-c:#09040f;--tile:none}
+html[data-theme=ghahve]{color-scheme:dark;--night:#140e0a;--deck:#1d1510;--raise:#2b2018;--line:#403026;--ink:#f6ece3;--mute:#b89f8b;--aril:#a8642a;--aril-d:#6f3f14;--on-aril:#fff;--melon:#e7b98a;--pista:#d9f99d;--on-pista:#141c00;--edge-c:#0a0705;--tile:none}
+html[data-theme=neon]{color-scheme:dark;--night:#05060f;--deck:#0a0c1c;--raise:#12152e;--line:#1f2450;--ink:#eaf0ff;--mute:#8a94c8;--aril:#ff2e93;--aril-d:#a3115f;--on-aril:#fff;--melon:#ff9ad0;--pista:#00f5d4;--on-pista:#00110e;--edge-c:#020308;--tile:none}
+html[data-theme=aghigh]{color-scheme:dark;--night:#14070b;--deck:#1e0b11;--raise:#2e1219;--line:#471b27;--ink:#fdeaee;--mute:#c597a0;--aril:#dc2626;--aril-d:#991b1b;--on-aril:#fff;--melon:#fca5a5;--pista:#fcd34d;--on-pista:#1c1400;--edge-c:#0a0305;--tile:none}
+html[data-theme=tala]{color-scheme:dark;--night:#0b0904;--deck:#14110a;--raise:#1f1a0e;--line:#36301a;--ink:#fbf3dc;--mute:#b5a782;--aril:#d4a017;--aril-d:#8a6508;--on-aril:#1a1300;--melon:#f3d77c;--pista:#9be7a8;--on-pista:#04140a;--edge-c:#050402;--tile:none}
+html[data-theme=barf]{color-scheme:light;--night:#fafafa;--deck:#ffffff;--raise:#efefef;--line:#dbdbdb;--ink:#262626;--mute:#737373;--aril:#0095f6;--aril-d:#0064e0;--on-aril:#fff;--melon:#0074cc;--pista:#00a86b;--on-pista:#fff;--edge-c:#c7c7c7;--tile:none}
+html[data-theme=nane]{color-scheme:light;--night:#eef8f3;--deck:#ffffff;--raise:#dff1e8;--line:#bfe0cf;--ink:#10291e;--mute:#55776a;--aril:#0f9d6b;--aril-d:#0a6b47;--on-aril:#fff;--melon:#0b7a53;--pista:#2563eb;--on-pista:#fff;--edge-c:#a8cdb9;--tile:none}
+html[data-theme=esfand]{color-scheme:light;--night:#f5f1ff;--deck:#ffffff;--raise:#ebe4ff;--line:#d6c9fb;--ink:#231a47;--mute:#6b5f99;--aril:#7c3aed;--aril-d:#5b21b6;--on-aril:#fff;--melon:#6d28d9;--pista:#0f766e;--on-pista:#fff;--edge-c:#bfb0ee;--tile:none}
+html[data-theme=shen]{color-scheme:light;--night:#f7f1e6;--deck:#fffdf8;--raise:#efe5d1;--line:#dccfb2;--ink:#2b2110;--mute:#7d6c4a;--aril:#b45309;--aril-d:#78350f;--on-aril:#fff;--melon:#92400e;--pista:#3f6212;--on-pista:#fff;--edge-c:#cdbd97;--tile:none}
+html[data-theme=gol]{color-scheme:light;--night:#fff1f4;--deck:#ffffff;--raise:#ffe0e8;--line:#ffc2d1;--ink:#3a0f1d;--mute:#9a5a6e;--aril:#e11d48;--aril-d:#9f1239;--on-aril:#fff;--melon:#be123c;--pista:#0e7490;--on-pista:#fff;--edge-c:#f0a9bd;--tile:none}
+/* picker layout */
+.pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pick-grid .pick{margin-top:0;min-width:0}
+.pick-grid.fonts{grid-template-columns:1fr}
+.pick .sw+span strong{font-size:14px}
+.font-opt{padding:10px 14px}
+.font-opt strong{font-size:17px;line-height:1.6}
+.font-opt small{font-size:13px;color:var(--mute);margin:0}
+.fsize{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:10px 12px;background:var(--night);border-radius:12px}
+.fsize span{white-space:nowrap}.fsize input{padding:0;border:0;background:none;accent-color:var(--aril)}.fsize b{min-width:22px;text-align:center}
+.card .side-sec{padding:14px 2px 6px}

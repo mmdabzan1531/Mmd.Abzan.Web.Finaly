@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: chatroom-mohammad-abzan
+    runtime: python
+    plan: starter            # persistent disk is only available on paid Render plans
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class gthread --workers 1 --threads 100 --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /healthz
+    disk:
+      name: chatroom-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: CHATROOM_SECRET
+        generateValue: true
+      - key: CHATROOM_DATA_DIR
+        value: /var/data
+      - key: CHATROOM_HTTPS
+        value: "1"
+      # email codes (Gmail app password) -> fill these in the Render dashboard
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      # if the host blocks SMTP, use the HTTP API instead:
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER
+        sync: false
+      # SMS codes (Iran)
+      - key: KAVENEGAR_KEY
+        sync: false
+      - key: KAVENEGAR_TEMPLATE
+        sync: false
