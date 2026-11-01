@@ -3,7 +3,7 @@
 <link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Chatroom"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="{{ url_for('static', filename='theme.js') }}?v={{ ASSET_V }}"></script>
-{% if LANG != 'fa' %}<script src="{{ url_for('static', filename='i18n-data.js') }}?v={{ ASSET_V }}"></script>{% endif %}
+{% if LANG != 'fa' %}<script src="{{ url_for('static', filename='i18n-data.js') }}?v={{ ASSET_V }}"></script><script src="{{ url_for('static', filename='i18n-data-chat.js') }}?v={{ ASSET_V }}"></script>{% endif %}
 <script src="{{ url_for('static', filename='i18n.js') }}?v={{ ASSET_V }}"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&family=Lalezar&display=swap">
