@@ -1,4 +1,4 @@
-import base64, json, os, re, uuid, secrets, threading, random, sqlite3, hashlib, hmac, smtplib, ssl
+import base64, json, os, re, uuid, secrets, threading, random, sqlite3, hashlib, hmac, smtplib, ssl, copy
 import urllib.request, urllib.parse, urllib.error
 from email.message import EmailMessage
 from collections import defaultdict, deque
@@ -10,6 +10,7 @@ import socket as pysocket
 from flask import (Flask, render_template, request, redirect, url_for, session,
                    flash, jsonify, send_from_directory)
 from flask_socketio import SocketIO, emit, join_room
+from flask import abort, Response
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -42,6 +43,9 @@ USERS_FILE = os.path.join(DATA_DIR, "users.json")
 GROUPS_FILE = os.path.join(DATA_DIR, "groups.json")
 DB_FILE = os.path.join(DATA_DIR, "chat.db")
 SUPPORT_FILE = os.path.join(DATA_DIR, "support.json")
+# Set DATABASE_URL (Neon / Supabase / any Postgres) to keep users, groups, messages and avatars across restarts.
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+USE_PG = bool(DATABASE_URL)
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 MAX_IMAGE_SIZE = 4 * 1024 * 1024
 PAGE = 60
@@ -91,9 +95,65 @@ online_sids = {}
 recent_sends = defaultdict(deque)
 
 
-# ---------- JSON store (users, groups) ----------
+# ---------- storage: Postgres when DATABASE_URL is set, otherwise local files + SQLite ----------
+_pool = None
+_kv_cache = {}          # key -> value (single process: write-through, so it is always current)
+
+if USE_PG:
+    try:
+        import psycopg2, psycopg2.pool, psycopg2.extras
+    except ImportError:
+        raise SystemExit("DATABASE_URL is set but psycopg2 is not installed: add 'psycopg2-binary' to requirements.txt")
+
+
+def _pg_pool():
+    global _pool
+    if _pool is None:
+        _pool = psycopg2.pool.ThreadedConnectionPool(
+            1, 8, DATABASE_URL, connect_timeout=15, keepalives=1, keepalives_idle=30,
+            keepalives_interval=10, keepalives_count=3)
+    return _pool
+
+
+def pg_run(sql, args=(), fetch=True):
+    """Run one statement on a pooled connection; reconnect once if the server dropped an idle connection."""
+    last = None
+    for _ in range(2):
+        pool = _pg_pool()
+        conn = pool.getconn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql, args)
+                rows = cur.fetchall() if (fetch and cur.description) else []
+            conn.commit()
+            pool.putconn(conn)
+            return rows
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            last = e
+            pool.putconn(conn, close=True)
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            pool.putconn(conn)
+            raise
+    raise last
+
+
+def _kv_key(path):
+    return os.path.basename(path)
+
+
+# ---------- JSON store (users, groups, support) ----------
 def write_json(path, value):
     with data_lock:
+        if USE_PG:
+            k = _kv_key(path)
+            pg_run("INSERT INTO kv(key, value) VALUES(%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                   (k, psycopg2.extras.Json(value)), fetch=False)
+            _kv_cache[k] = copy.deepcopy(value)
+            return
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(value, f, ensure_ascii=False, indent=2)
@@ -102,6 +162,16 @@ def write_json(path, value):
 
 def read_json(path, default):
     with data_lock:
+        if USE_PG:
+            k = _kv_key(path)
+            if k in _kv_cache:
+                return copy.deepcopy(_kv_cache[k])
+            rows = pg_run("SELECT value FROM kv WHERE key = %s", (k,))
+            if rows:
+                _kv_cache[k] = rows[0]["value"]
+                return copy.deepcopy(rows[0]["value"])
+            write_json(path, default)
+            return copy.deepcopy(default)
         try:
             with open(path, encoding="utf-8") as f:
                 return json.load(f)
@@ -110,7 +180,7 @@ def read_json(path, default):
             return default
 
 
-# ---------- SQLite store (messages: permanent history) ----------
+# ---------- message store (permanent history) ----------
 def db():
     c = sqlite3.connect(DB_FILE, timeout=15)
     c.row_factory = sqlite3.Row
@@ -118,6 +188,9 @@ def db():
 
 
 def q(sql, args=(), one=False, commit=False):
+    if USE_PG:
+        rows = pg_run(sql.replace("?", "%s"), tuple(args))
+        return (rows[0] if rows else None) if one else rows
     with closing(db()) as c:
         rows = c.execute(sql, args).fetchall()
         if commit:
@@ -130,6 +203,16 @@ SELECT_MSG = ("SELECT m.*, p.text AS reply_text, p.username AS reply_user "
 
 
 def init_db():
+    if USE_PG:
+        for stmt in (
+            "CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value JSONB NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS media(name TEXT PRIMARY KEY, mime TEXT NOT NULL, data BYTEA NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS messages(seq BIGSERIAL PRIMARY KEY, id TEXT UNIQUE NOT NULL, "
+            "group_id TEXT NOT NULL, username TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL, "
+            "reply_to TEXT DEFAULT '', edited INTEGER DEFAULT 0, forwarded_from TEXT DEFAULT '')",
+            "CREATE INDEX IF NOT EXISTS idx_group_seq ON messages(group_id, seq)"):
+            pg_run(stmt, fetch=False)
+        return
     with closing(db()) as c:
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("""CREATE TABLE IF NOT EXISTS messages(
@@ -157,8 +240,8 @@ def init_db():
 
 
 def init_data():
-    if not os.path.exists(USERS_FILE):
-        write_json(USERS_FILE, {})
+    init_db()
+    read_json(USERS_FILE, {})      # creates it only when missing (never overwrites)
     groups = read_json(GROUPS_FILE, {})
     groups.pop("general", None)  # no public chat anymore
     for gid, g in groups.items():
@@ -167,10 +250,15 @@ def init_data():
         g.setdefault("type", "group")
         g.setdefault("invite_code", secrets.token_urlsafe(12))
     write_json(GROUPS_FILE, groups)
-    init_db()
 
 
 init_data()
+if USE_PG and not os.environ.get("CHATROOM_SECRET"):
+    _sec = read_json(os.path.join(DATA_DIR, "secret.json"), {})
+    if not _sec.get("v"):
+        _sec = {"v": secrets.token_hex(32)}
+        write_json(os.path.join(DATA_DIR, "secret.json"), _sec)
+    app.config["SECRET_KEY"] = _sec["v"]
 
 
 def shape(r, users):
@@ -618,6 +706,7 @@ def new_code():
 
 
 def startup_report():
+    print("\n  storage:", "Postgres (data is permanent)" if USE_PG else "local files (lost on every Render restart!)")
     print("\n  ---- verification codes ----")
     print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_APP_PASSWORD)")
     print("  sms   :", "READY" if sms_ready() else "NOT configured (set KAVENEGAR_KEY / SMSIR_KEY / TWILIO_*)")
@@ -789,6 +878,12 @@ def favicon():
 
 @app.route("/media/<path:filename>")
 def media(filename):
+    if USE_PG:
+        rows = q("SELECT mime, data FROM media WHERE name=?", (filename,))
+        if not rows:
+            abort(404)
+        return Response(bytes(rows[0]["data"]), mimetype=rows[0]["mime"],
+                        headers={"Cache-Control": "public, max-age=2592000"})
     return send_from_directory(UPLOAD_DIR, filename, max_age=30 * 24 * 3600)
 
 
@@ -1096,7 +1191,12 @@ def update_profile():
             if size > MAX_IMAGE_SIZE:
                 return jsonify(error="حجم عکس باید کمتر از ۴ مگابایت باشد."), 400
             filename = f"{uuid.uuid4().hex}{ext}"
-            photo.save(os.path.join(UPLOAD_DIR, filename))
+            if USE_PG:
+                mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                        ".webp": "image/webp", ".gif": "image/gif"}[ext]
+                q("INSERT INTO media(name, mime, data) VALUES(?,?,?)", (filename, mime, psycopg2.Binary(photo.read())), commit=True)
+            else:
+                photo.save(os.path.join(UPLOAD_DIR, filename))
             users[username]["avatar_url"] = "/media/" + filename
         users[username].update(display_name=display_name, bio=bio, avatar=avatar,
                                show_phone=request.form.get("show_phone") == "1", show_email=request.form.get("show_email") == "1")
