@@ -390,8 +390,30 @@ def smtp_settings():
     return None
 
 
+def gmail_api_ready():
+    return bool(env("GMAIL_CLIENT_ID") and env("GMAIL_CLIENT_SECRET") and env("GMAIL_REFRESH_TOKEN") and env("GMAIL_USER"))
+
+
 def email_ready():
-    return bool(smtp_settings() or (env("BREVO_API_KEY") and env("BREVO_SENDER")))
+    return bool(gmail_api_ready() or smtp_settings() or (env("BREVO_API_KEY") and env("BREVO_SENDER")))
+
+
+def _gmail_api_send(msg):
+    """Send through the Gmail API over HTTPS (port 443) - works on hosts that block SMTP (e.g. Render free)."""
+    tok_body = urllib.parse.urlencode({
+        "client_id": env("GMAIL_CLIENT_ID"), "client_secret": env("GMAIL_CLIENT_SECRET"),
+        "refresh_token": env("GMAIL_REFRESH_TOKEN"), "grant_type": "refresh_token"}).encode()
+    st, out = _http("https://oauth2.googleapis.com/token", tok_body,
+                    {"Content-Type": "application/x-www-form-urlencoded"}, "POST")
+    if st != 200:
+        raise RuntimeError(f"token {st}: {out[:200]}")
+    access = json.loads(out)["access_token"]
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    st, out = _http("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                    json.dumps({"raw": raw}).encode(),
+                    {"Authorization": "Bearer " + access, "Content-Type": "application/json"}, "POST")
+    if not 200 <= st < 300:
+        raise RuntimeError(f"send {st}: {out[:200]}")
 
 
 def send_email(to, code, purpose="signup"):
@@ -402,27 +424,40 @@ def send_email(to, code, purpose="signup"):
             f'border-radius:14px;text-align:center"><h2 style="margin:0 0 6px">Chatroom</h2><p style="color:#666;margin:0 0 18px">{title}</p>'
             f'<div style="font-size:34px;letter-spacing:8px;font-weight:700;direction:ltr;background:#f4f4f6;border-radius:12px;padding:14px">{code}</div>'
             f'<p style="color:#888;font-size:13px;margin-top:16px;line-height:1.9">این کد تا ۵ دقیقه معتبر است.<br>اگر خودت درخواست نکرده‌ای این ایمیل را نادیده بگیر و کد را به کسی نده.</p></div>')
+    def build(sender):
+        msg = EmailMessage()
+        msg["Subject"], msg["To"], msg["From"] = subject, to, f"Chatroom <{sender}>" if sender else ""
+        msg.set_content(text)
+        msg.add_alternative(html, subtype="html")
+        return msg
+
+    if gmail_api_ready():
+        try:
+            _gmail_api_send(build(env("GMAIL_USER")))
+            print("[email] sent via Gmail API ->", to)
+            return True
+        except Exception as e:
+            print("[email] Gmail API failed:", repr(e))
     cfg = smtp_settings()
     if cfg:
         host, port, user, pwd, sender = cfg
-        try:
-            msg = EmailMessage()
-            msg["Subject"], msg["To"], msg["From"] = subject, to, f"Chatroom <{sender}>" if sender else ""
-            msg.set_content(text)
-            msg.add_alternative(html, subtype="html")
-            ctx = ssl.create_default_context()
-            if port == 465:
-                with smtplib.SMTP_SSL(host, port, timeout=15, context=ctx) as s:
-                    if user: s.login(user, pwd)
-                    s.send_message(msg)
-            else:
-                with smtplib.SMTP(host, port, timeout=15) as s:
-                    s.ehlo(); s.starttls(context=ctx); s.ehlo()
-                    if user: s.login(user, pwd)
-                    s.send_message(msg)
-            return True
-        except Exception as e:
-            print("[email] SMTP failed:", repr(e))
+        ctx = ssl.create_default_context()
+        for p in ([port, 465] if port != 465 else [465]):      # try 587 (STARTTLS), then 465 (SSL)
+            try:
+                msg = build(sender)
+                if p == 465:
+                    with smtplib.SMTP_SSL(host, p, timeout=15, context=ctx) as srv:
+                        if user: srv.login(user, pwd)
+                        srv.send_message(msg)
+                else:
+                    with smtplib.SMTP(host, p, timeout=15) as srv:
+                        srv.ehlo(); srv.starttls(context=ctx); srv.ehlo()
+                        if user: srv.login(user, pwd)
+                        srv.send_message(msg)
+                print(f"[email] sent via SMTP:{p} ->", to)
+                return True
+            except Exception as e:
+                print(f"[email] SMTP:{p} failed:", repr(e))
     if env("BREVO_API_KEY") and env("BREVO_SENDER"):
         try:
             body = json.dumps({"sender": {"name": "Chatroom", "email": env("BREVO_SENDER")}, "to": [{"email": to}],
@@ -540,7 +575,7 @@ def new_code():
 
 def startup_report():
     print("\n  ---- verification codes ----")
-    print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_APP_PASSWORD)")
+    print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN, or GMAIL_APP_PASSWORD)")
     print("  sms   :", "READY" if sms_ready() else "NOT configured (set KAVENEGAR_KEY / SMSIR_KEY / TWILIO_*)")
     if DEV_CODES:
         print("  !! CHATROOM_DEV_CODES=1 -> codes are shown on screen. Never use this on a public server.")
