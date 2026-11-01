@@ -567,7 +567,6 @@ def startup_report():
         print("  !! CHATROOM_DEV_CODES=1 -> codes are shown on screen. Never use this on a public server.")
 
 
-
 # ---------- ChatRoom assistant bot (a private chat every account gets) ----------
 BOT_USER = "chatroom_bot"
 BOT_PROFILE = {"display_name": "ChatRoom | محمد مهدی آبزن", "bio": "دستیار رسمی ChatRoom؛ آموزش، راهنما و پاسخ به پرسش‌های شما",
