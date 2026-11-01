@@ -17,7 +17,7 @@ from functools import wraps
 import time
 import socket as pysocket
 from flask import (Flask, render_template, request, redirect, url_for, session,
-                   flash, jsonify, send_from_directory)
+                   flash, jsonify, send_from_directory, make_response)
 from flask_socketio import SocketIO, emit, join_room
 from flask import abort, Response
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -420,6 +420,64 @@ def insert_message(gid, username, text, reply_to="", forwarded_from="", attach="
     return shape(row, read_json(USERS_FILE, {}))
 
 
+# ---------- languages ----------
+# The whole UI is written in Persian; static/i18n.js (+ i18n-data.js) translates it in the browser for the other languages.
+LANGS = [("fa", "فارسی"), ("en", "English"), ("ar", "العربية"), ("tr", "Türkçe"),
+         ("ru", "Русский"), ("es", "Español"), ("fr", "Français"), ("zh", "中文")]
+LANG_CODES = [c for c, _ in LANGS]
+RTL_LANGS = {"fa", "ar"}
+LANG_COOKIE = "lang"
+
+
+def cookie_lang():
+    """The language the visitor picked ('' when they have not picked one yet)."""
+    c = request.cookies.get(LANG_COOKIE, "")
+    return c if c in LANG_CODES else ""
+
+
+def current_lang():
+    return cookie_lang() or "fa"
+
+
+def set_lang_cookie(resp, code):
+    # not HttpOnly on purpose: static/i18n.js reads it to switch language and direction before the page renders
+    resp.set_cookie(LANG_COOKIE, code, max_age=365 * 24 * 3600, samesite="Lax", path="/",
+                    secure=bool(app.config.get("SESSION_COOKIE_SECURE")))
+    return resp
+
+
+def safe_next(p):
+    p = str(p or "/")
+    if (not p.startswith("/") or p.startswith("//") or "\\" in p or "\n" in p or "\r" in p
+            or p.startswith("/lang") or len(p) > 300):
+        return "/"
+    return p
+
+
+def sync_user_lang(resp, username):
+    """The language chosen on this device is saved on the account; with no choice, the account's language is used."""
+    chosen = cookie_lang()
+    with data_lock:
+        users = read_json(USERS_FILE, {})
+        u = users.get(username)
+        if u is None:
+            return resp
+        if chosen:
+            if u.get("lang") != chosen:
+                u["lang"] = chosen
+                write_json(USERS_FILE, users)
+        elif u.get("lang") in LANG_CODES:
+            set_lang_cookie(resp, u["lang"])
+    return resp
+
+
+def need_lang_choice():
+    """Redirect to the language picker the first time someone opens the login / signup / forgot pages."""
+    if cookie_lang():
+        return None
+    return redirect(url_for("lang_page", next=request.path))
+
+
 # ---------- helpers ----------
 def logged_in(fn):
     @wraps(fn)
@@ -499,7 +557,8 @@ def login_user(username):
 
 def start_session(username):
     inv = login_user(username)
-    return redirect(url_for("join_invite", invite_code=inv)) if inv else redirect(url_for("chat"))
+    resp = redirect(url_for("join_invite", invite_code=inv)) if inv else redirect(url_for("chat"))
+    return sync_user_lang(resp, username)
 
 
 def join_sids(username, gid):
@@ -843,6 +902,7 @@ def startup_report():
     print("  async  :", ASYNC_MODE)
     print("\n  storage:", "Postgres (data is permanent)" if USE_PG else "local files (lost on every Render restart!)")
     print(f"\n  files  : photos & files up to {MAX_FILE_MB} MB")
+    print("\n  languages:", ", ".join(LANG_CODES))
     print("\n  ---- verification codes ----")
     print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_APP_PASSWORD)")
     print("  sms   :", "READY" if sms_ready() else "NOT configured (set KAVENEGAR_KEY / SMSIR_KEY / TWILIO_*)")
@@ -1049,12 +1109,37 @@ def api_login(fn):
 _DUMMY_HASH = generate_password_hash("not-a-real-password")
 
 
+# ----- language picker -----
+@app.route("/lang")
+def lang_page():
+    return render_template("lang.html", nxt=safe_next(request.args.get("next")), current=current_lang())
+
+
+@app.route("/lang/<code>")
+def set_lang(code):
+    if code not in LANG_CODES:
+        abort(404)
+    resp = redirect(safe_next(request.args.get("next")))
+    set_lang_cookie(resp, code)
+    if "username" in session:                       # logged-in users keep their choice on the account
+        with data_lock:
+            users = read_json(USERS_FILE, {})
+            u = users.get(session["username"])
+            if u is not None and u.get("lang") != code:
+                u["lang"] = code
+                write_json(USERS_FILE, users)
+    return resp
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if "username" in session:
         return redirect(url_for("chat"))
     need = session.get("login_fails", 0) >= 3          # captcha only after repeated failures (like big sites)
     if request.method == "GET":
+        pick = need_lang_choice()                      # first visit: ask for the language
+        if pick:
+            return pick
         return render_template("index.html", need_captcha=need, captcha_question=new_captcha() if need else "")
     ident = request.form.get("identifier", "").strip()[:120]
     password = request.form.get("password", "")
@@ -1078,6 +1163,9 @@ def index():
 def signup_page():
     if "username" in session:
         return redirect(url_for("chat"))
+    pick = need_lang_choice()
+    if pick:
+        return pick
     return render_template("signup.html", captcha_question=new_captcha())
 
 
@@ -1085,6 +1173,9 @@ def signup_page():
 def forgot_page():
     if "username" in session:
         return redirect(url_for("chat"))
+    pick = need_lang_choice()
+    if pick:
+        return pick
     return render_template("forgot.html", captcha_question=new_captcha())
 
 
@@ -1167,18 +1258,21 @@ def signup_verify():
         return jsonify(error="تعداد تلاش‌ها زیاد بود؛ دوباره ثبت‌نام کن."), 429
     if not hmac.compare_digest(rec["code"], code):
         return jsonify(error="کد اشتباه است."), 400
+    lang = cookie_lang() or "fa"                      # the language picked before signing up is saved on the new account
     with data_lock:
         users = read_json(USERS_FILE, {})
         if any(n.lower() == rec["username"].lower() for n in users):
             return jsonify(error="این نام کاربری همین الان گرفته شد."), 409
         users[rec["username"]] = {"username": rec["username"], "password_hash": rec["password_hash"], "display_name": rec["display_name"],
                                   "bio": "", "avatar": "🙂", "avatar_url": "", "email": rec["email"], "phone": rec["phone"],
-                                  "show_email": False, "show_phone": False, "created_at": datetime.now(timezone.utc).isoformat()}
+                                  "show_email": False, "show_phone": False, "lang": lang,
+                                  "created_at": datetime.now(timezone.utc).isoformat()}
         write_json(USERS_FILE, users)
     pending.pop(token, None)
     onboard_bot_chat(rec["username"])
     inv = login_user(rec["username"])
-    return jsonify(ok=True, redirect=url_for("join_invite", invite_code=inv) if inv else url_for("chat"))
+    resp = jsonify(ok=True, redirect=url_for("join_invite", invite_code=inv) if inv else url_for("chat"))
+    return set_lang_cookie(resp, lang)
 
 
 # ----- forgot password: identifier -> code -> new password -----
@@ -1263,7 +1357,7 @@ def forgot_verify():
         write_json(USERS_FILE, users)
     pending_reset.pop(token, None)
     login_user(rec["username"])
-    return jsonify(ok=True, redirect=url_for("chat"))
+    return sync_user_lang(jsonify(ok=True, redirect=url_for("chat")), rec["username"])
 
 
 @app.route("/chat")
@@ -1275,8 +1369,9 @@ def chat():
         session.clear()
         return redirect(url_for("index"))
     session.permanent = True
-    return render_template("chat.html", current_user=safe_user_public(users[username], True),
-                           groups=my_groups(username), users=visible_users(username))
+    resp = make_response(render_template("chat.html", current_user=safe_user_public(users[username], True),
+                                         groups=my_groups(username), users=visible_users(username)))
+    return sync_user_lang(resp, username)
 
 
 @app.route("/logout")
@@ -1458,7 +1553,8 @@ def inject_site():
     y = n.year - 621 if (n.month, n.day) >= (3, 21) else n.year - 622
     return {"SITE": {"email": env("SUPPORT_EMAIL", "support@chatroom.example"), "phone": env("SUPPORT_PHONE", "۰۹۱۲۰۰۰۰۰۰۰"),
                      "tel": env("SUPPORT_TEL", "۰۲۱-۹۱۰۰۰۰۰۰"), "address": env("SUPPORT_ADDRESS", "تهران، خیابان نمونه، پلاک ۱۰ (اطلاعات آزمایشی)"),
-                     "year": str(y).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))}}
+                     "year": str(y).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))},
+            "LANG": current_lang(), "LANGS": LANGS}
 
 
 @app.route("/privacy")
