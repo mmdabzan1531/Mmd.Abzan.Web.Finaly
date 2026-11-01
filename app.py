@@ -380,7 +380,7 @@ def _http(url, data=None, headers=None, method=None, timeout=15):
 PURPOSE = {"signup": "تأیید ثبت‌نام", "reset": "بازیابی رمز عبور"}
 
 
-# --- email: Gmail API (HTTPS) -> SMTP -> Brevo ---
+# --- email: Gmail / any SMTP, or Brevo HTTP API (for hosts that block SMTP ports) ---
 def smtp_settings():
     if env("GMAIL_USER") and env("GMAIL_APP_PASSWORD"):
         return "smtp.gmail.com", 587, env("GMAIL_USER"), env("GMAIL_APP_PASSWORD").replace(" ", ""), env("GMAIL_USER")
@@ -390,65 +390,45 @@ def smtp_settings():
     return None
 
 
-def gmail_api_ready():
-    return bool(env("GMAIL_CLIENT_ID") and env("GMAIL_CLIENT_SECRET") and env("GMAIL_REFRESH_TOKEN") and env("GMAIL_USER"))
-
-
 def email_ready():
-    return bool(gmail_api_ready() or smtp_settings() or (env("BREVO_API_KEY") and env("BREVO_SENDER")))
-
-
-def _send_gmail_api(to, subject, text, html):
-    # 1) access token from refresh token
-    status, out = _http("https://oauth2.googleapis.com/token", urllib.parse.urlencode({
-        "client_id": env("GMAIL_CLIENT_ID"), "client_secret": env("GMAIL_CLIENT_SECRET"),
-        "refresh_token": env("GMAIL_REFRESH_TOKEN"), "grant_type": "refresh_token"}).encode(),
-        {"Content-Type": "application/x-www-form-urlencoded"}, "POST")
-    if status != 200:
-        print("[email] Gmail token failed:", status, out[:200])
-        return False
-    token = json.loads(out).get("access_token", "")
-    # 2) build and send the message
-    msg = EmailMessage()
-    msg["Subject"], msg["To"], msg["From"] = subject, to, f"Chatroom <{env('GMAIL_USER')}>"
-    msg.set_content(text)
-    msg.add_alternative(html, subtype="html")
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    status, out = _http("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-                        json.dumps({"raw": raw}).encode(),
-                        {"Authorization": "Bearer " + token, "Content-Type": "application/json"}, "POST")
-    if 200 <= status < 300:
-        print("[email] sent via Gmail API ->", to)
-        return True
-    print("[email] Gmail API failed:", status, out[:200])
-    return False
+    return bool(smtp_settings() or (env("BREVO_API_KEY") and env("BREVO_SENDER")))
 
 
 def send_email(to, code, purpose="signup"):
     title = PURPOSE.get(purpose, "کد تأیید")
-    subject = "کد تأیید Chatroom"            # no code / emoji in the subject: looks less like spam
-    text = (f"سلام،\n{title} در Chatroom\n\nکد تأیید شما: {code}\n\n"
-            "این کد تا ۵ دقیقه معتبر است. اگر خودت درخواست نکرده‌ای، این پیام را نادیده بگیر.")
-    html = (f'<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:420px;margin:auto;padding:20px;text-align:center">'
-            f'<p style="margin:0 0 12px">سلام، {title} در Chatroom</p>'
-            f'<p style="margin:0 0 6px">کد تأیید شما:</p>'
-            f'<p style="font-size:30px;letter-spacing:6px;font-weight:700;direction:ltr;margin:0 0 14px">{code}</p>'
-            f'<p style="color:#666;font-size:13px;line-height:1.9;margin:0">این کد تا ۵ دقیقه معتبر است.<br>'
-            f'اگر خودت درخواست نکرده‌ای، این پیام را نادیده بگیر.</p></div>')
-
-    if gmail_api_ready():
-        try:
-            if _send_gmail_api(to, subject, text, html):
-                return True
-        except Exception as e:
-            print("[email] Gmail API error:", repr(e))
-
+    brand = "ChatRoom | محمد مهدی آبزن"
+    subject = f"{code} — کد تأیید {brand}"
+    intro = {"signup": "برای ساخت حساب کاربری‌تان در ChatRoom، لطفاً کد زیر را در صفحه‌ی ثبت‌نام وارد کنید.",
+             "reset": "درخواستی برای بازیابی رمز عبور حساب شما در ChatRoom ثبت شد. برای تعیین رمز جدید، کد زیر را وارد کنید."}.get(
+        purpose, "برای ادامه، کد زیر را در ChatRoom وارد کنید.")
+    text = (f"{brand}\n{title}\n\n{intro}\n\nکد تأیید شما: {code}\n\n"
+            "این کد تا ۵ دقیقه معتبر است و فقط یک بار قابل استفاده است.\n"
+            "برای حفظ امنیت حساب‌تان، این کد را هرگز با کسی در میان نگذارید؛ تیم ChatRoom هیچ‌گاه کد را از شما نمی‌پرسد.\n"
+            "اگر خودتان این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید؛ هیچ تغییری در حساب شما ایجاد نخواهد شد.\n\n"
+            "با احترام، تیم ChatRoom — محمد مهدی آبزن")
+    logo = env("EMAIL_LOGO_URL")
+    logo_tag = (f'<img src="{logo}" width="96" height="96" alt="ChatRoom" '
+                f'style="display:block;margin:0 auto 14px;border-radius:50%;border:1px solid #4a4a52">') if logo else ""
+    line = '<div style="height:1px;background:#2c2c33;margin:22px 0"></div>'
+    html = (f'<div dir="rtl" style="background:#09090b;padding:28px 12px;font-family:Tahoma,Arial,sans-serif">'
+            f'<div style="max-width:460px;margin:auto;background:#121215;border:1px solid #33333a;border-radius:18px;padding:30px 26px;text-align:center;color:#d9d9de">'
+            f'{logo_tag}'
+            f'<div style="letter-spacing:4px;font-size:12px;color:#8d8d97">CHAT ROOM</div>'
+            f'<h2 style="margin:6px 0 2px;color:#f2f2f5;font-size:20px">ChatRoom | محمد مهدی آبزن</h2>'
+            f'<p style="color:#a9a9b2;margin:0 0 6px;font-size:14px">{title}</p>{line}'
+            f'<p style="color:#c4c4cb;font-size:14px;line-height:2.1;margin:0 0 16px">سلام 👋<br>{intro}</p>'
+            f'<div style="font-size:36px;letter-spacing:10px;font-weight:700;direction:ltr;color:#fff;background:#1a1a1f;'
+            f'border:1px solid #55555e;border-radius:12px;padding:16px">{code}</div>'
+            f'<p style="color:#9a9aa3;font-size:13px;line-height:2.1;margin:16px 0 0">⏱ این کد تا <b style="color:#d9d9de">۵ دقیقه</b> معتبر است و فقط یک بار قابل استفاده است.</p>{line}'
+            f'<p style="color:#8a8a93;font-size:12.5px;line-height:2.1;margin:0">🔒 این کد را هرگز با کسی در میان نگذارید؛ تیم ChatRoom هیچ‌گاه کد را از شما نمی‌پرسد.<br>'
+            f'اگر خودتان این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید؛ هیچ تغییری در حساب شما ایجاد نمی‌شود.</p>{line}'
+            f'<p style="color:#6f6f78;font-size:12px;margin:0">با احترام، تیم ChatRoom<br>محمد مهدی آبزن</p></div></div>')
     cfg = smtp_settings()
     if cfg:
         host, port, user, pwd, sender = cfg
         try:
             msg = EmailMessage()
-            msg["Subject"], msg["To"], msg["From"] = subject, to, f"Chatroom <{sender}>" if sender else ""
+            msg["Subject"], msg["To"], msg["From"] = subject, to, f"ChatRoom | محمد مهدی آبزن <{sender}>" if sender else ""
             msg.set_content(text)
             msg.add_alternative(html, subtype="html")
             ctx = ssl.create_default_context()
@@ -464,10 +444,9 @@ def send_email(to, code, purpose="signup"):
             return True
         except Exception as e:
             print("[email] SMTP failed:", repr(e))
-
     if env("BREVO_API_KEY") and env("BREVO_SENDER"):
         try:
-            body = json.dumps({"sender": {"name": "Chatroom", "email": env("BREVO_SENDER")}, "to": [{"email": to}],
+            body = json.dumps({"sender": {"name": "ChatRoom | محمد مهدی آبزن", "email": env("BREVO_SENDER")}, "to": [{"email": to}],
                                "subject": subject, "htmlContent": html, "textContent": text}).encode()
             status, out = _http("https://api.brevo.com/v3/smtp/email", body, {"api-key": env("BREVO_API_KEY"),
                                 "Content-Type": "application/json", "accept": "application/json"}, "POST")
@@ -569,7 +548,7 @@ def channel_missing(email, phone):
     if DEV_CODES:
         return ""
     if email and not email_ready():
-        return "ارسال ایمیل روی این سرور تنظیم نشده است؛ مدیر سایت باید ارسال ایمیل را تنظیم کند."
+        return "ارسال ایمیل روی این سرور تنظیم نشده است؛ مدیر سایت باید Gmail یا SMTP را تنظیم کند."
     if phone and not sms_ready_for(phone):
         return ("ارسال پیامک برای این شماره روی سرور تنظیم نشده است؛ مدیر سایت باید سرویس پیامک را تنظیم کند."
                 if phone.startswith("09") else "برای شماره‌های خارجی، سرویس پیامک بین‌المللی (Twilio) باید تنظیم شود. می‌توانی با ایمیل ثبت‌نام کنی.")
@@ -582,10 +561,134 @@ def new_code():
 
 def startup_report():
     print("\n  ---- verification codes ----")
-    print("  email :", ("READY (" + ("Gmail API" if gmail_api_ready() else "SMTP" if smtp_settings() else "Brevo") + ")") if email_ready() else "NOT configured (set GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN + GMAIL_USER, or BREVO_API_KEY + BREVO_SENDER)")
+    print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_APP_PASSWORD)")
     print("  sms   :", "READY" if sms_ready() else "NOT configured (set KAVENEGAR_KEY / SMSIR_KEY / TWILIO_*)")
     if DEV_CODES:
         print("  !! CHATROOM_DEV_CODES=1 -> codes are shown on screen. Never use this on a public server.")
+
+
+
+# ---------- ChatRoom assistant bot (a private chat every account gets) ----------
+BOT_USER = "chatroom_bot"
+BOT_PROFILE = {"display_name": "ChatRoom | محمد مهدی آبزن", "bio": "دستیار رسمی ChatRoom؛ آموزش، راهنما و پاسخ به پرسش‌های شما",
+               "avatar": "🤖", "avatar_url": "/static/bot.jpg"}
+
+BOT_WELCOME = (
+    "سلام به ChatRoom | محمد مهدی آبزن خوش آمدید! 👋\n"
+    "اینجا خانه‌ی گفتگوهای سریع، خصوصی و منظم شماست.\n"
+    "من دستیار ChatRoom هستم و هر زمان به راهنمایی نیاز داشتید، در کنارتان خواهم بود.\n"
+    "می‌توانید پیام خصوصی بفرستید، گروه بسازید، دوستانتان را با لینک دعوت به گفتگو بیاورید و ظاهر برنامه را با تم‌ها و فونت‌های دلخواه تغییر دهید.\n"
+    "اگر بخشی از برنامه برایتان ناآشناست، کافی است عدد یکی از گزینه‌های زیر را برایم بفرستید تا با کمال میل توضیح دهم."
+)
+
+BOT_MENU = (
+    "📋 منوی راهنما\n"
+    "۱ ـ شروع کار با برنامه\n"
+    "۲ ـ ساخت گروه و دعوت دوستان\n"
+    "۳ ـ پیام خصوصی و جستجوی کاربران\n"
+    "۴ ـ تغییر تم و فونت\n"
+    "۵ ـ ویرایش پروفایل و حریم خصوصی\n"
+    "۶ ـ ویژگی‌های برنامه\n"
+    "۷ ـ آیا این برنامه پیشرفته‌تر خواهد شد؟\n"
+    "۸ ـ ارتباط با پشتیبانی\n"
+    "\nبرای دیدن دوباره‌ی این منو، کلمه‌ی «منو» را بفرستید."
+)
+
+BOT_ANSWERS = {
+    "1": ("🚀 شروع کار\n"
+          "۱. از ستون کناری، گفتگوهای خود را می‌بینید؛ برای جستجو، نام گفتگو یا نام کاربری را در کادر بالای ستون بنویسید.\n"
+          "۲. با دکمه‌ی «+» یک گروه جدید می‌سازید.\n"
+          "۳. پیام را در کادر پایین بنویسید و دکمه‌ی ➤ را بزنید.\n"
+          "۴. با نگه داشتن یا کلیک روی یک پیام می‌توانید پاسخ بدهید، ویرایش کنید، حذف کنید یا آن را به گفتگوی دیگری بفرستید؛ ویرایش و حذف فقط برای پیام‌های خودتان ممکن است.\n"
+          "۵. تنظیمات، پشتیبانی و خروج از حساب در پایین ستون کناری قرار دارند."),
+    "2": ("👥 ساخت گروه و دعوت دوستان\n"
+          "۱. دکمه‌ی «+» را بزنید، نام و توضیحات گروه را بنویسید و «ساخت گروه» را انتخاب کنید.\n"
+          "۲. داخل گروه روی «لینک دعوت» بزنید و لینک را برای دوستانتان بفرستید؛ هر کس با آن وارد شود، عضو گروه می‌شود.\n"
+          "۳. فهرست اعضا از دکمه‌ی «اعضا» در بالای صفحه نمایش داده می‌شود.\n"
+          "۴. فقط سازنده‌ی گروه می‌تواند نام و توضیحات را از «تنظیمات» گروه تغییر دهد."),
+    "3": ("💬 پیام خصوصی و جستجوی کاربران\n"
+          "۱. نام کاربری یا نام نمایشی فرد را در کادر جستجو بنویسید (حداقل دو حرف).\n"
+          "۲. روی نام او بزنید و گزینه‌ی «ارسال پیام» را انتخاب کنید.\n"
+          "۳. گفتگوی خصوصی تا زمانی که اولین پیام ارسال نشود، برای طرف مقابل نمایش داده نمی‌شود."),
+    "4": ("🎨 تم و فونت\n"
+          "۱. «تنظیمات» را در ستون کناری باز کنید.\n"
+          "۲. «🎨 تم‌ها» را برای انتخاب از میان ۱۶ تم تیره و روشن بزنید.\n"
+          "۳. «🔤 فونت‌ها» را برای انتخاب فونت و تغییر اندازه‌ی متن بزنید.\n"
+          "این دو دکمه در پایین صفحه‌ی ورود هم هستند و انتخاب شما روی همان دستگاه ذخیره می‌شود."),
+    "5": ("👤 پروفایل و حریم خصوصی\n"
+          "۱. روی نام خود، پایین ستون کناری بزنید یا «تنظیمات» را باز کنید.\n"
+          "۲. عکس، ایموجی، نام نمایشی و بیو را تغییر دهید و «ذخیره» را بزنید.\n"
+          "۳. شماره و ایمیل شما به‌صورت پیش‌فرض برای دیگران پنهان است؛ فقط با روشن کردن «نمایش شماره» یا «نمایش ایمیل» دیده می‌شوند.\n"
+          "۴. اگر رمز عبورتان را فراموش کردید، از صفحه‌ی ورود گزینه‌ی «رمز خود را فراموش کرده‌اید؟» را انتخاب کنید."),
+    "6": ("✨ ویژگی‌های ChatRoom\n"
+          "• ارسال و دریافت لحظه‌ای پیام‌ها\n"
+          "• پیام خصوصی و گروه‌های دعوت‌محور\n"
+          "• پاسخ، ویرایش، حذف و فوروارد پیام\n"
+          "• نمایش وضعیت آنلاین بودن و در حال نوشتن\n"
+          "• ۱۶ تم رنگی و بیش از ۳۰ فونت فارسی\n"
+          "• قابلیت نصب روی موبایل و کامپیوتر (PWA)\n"
+          "• ثبت‌نام و بازیابی رمز با ایمیل یا پیامک\n"
+          "• حفظ حریم خصوصی: شماره و ایمیل فقط با اجازه‌ی خودتان نمایش داده می‌شود"),
+    "7": ("🔮 آیا ChatRoom پیشرفته‌تر خواهد شد؟\n"
+          "بله! ChatRoom یک پروژه‌ی زنده است و توسعه‌ی آن ادامه دارد. هدف ما سریع‌تر، امن‌تر و کاربردی‌تر شدن برنامه است و پیشنهادهای شما در این مسیر نقش مهمی دارند.\n"
+          "اگر ایده یا مشکلی دارید، از بخش «پشتیبانی» برایمان بنویسید؛ همه‌ی پیام‌ها خوانده می‌شود. 💙"),
+    "8": ("🛟 پشتیبانی\n"
+          "برای گزارش مشکل، پرسش یا پیشنهاد، به صفحه‌ی /support بروید (از ستون کناری، گزینه‌ی «پشتیبانی») و فرم را پر کنید. پس از ارسال، یک کد پیگیری دریافت می‌کنید."),
+}
+BOT_ALIASES = {"شروع": "1", "start": "1", "/start": "1", "گروه": "2", "دعوت": "2", "پیام خصوصی": "3", "جستجو": "3",
+               "تم": "4", "فونت": "4", "پروفایل": "5", "حریم خصوصی": "5", "ویژگی": "6", "ویژگی ها": "6", "ویژگی‌ها": "6",
+               "پیشرفته": "7", "آینده": "7", "پشتیبانی": "8"}
+BOT_MENU_WORDS = {"منو", "menu", "/menu", "راهنما", "help", "/help", "سلام", "hi", "hello"}
+
+
+def ensure_bot():
+    """Create/refresh the bot account (it has a random password, so nobody can log in as it)."""
+    with data_lock:
+        users = read_json(USERS_FILE, {})
+        u = users.get(BOT_USER)
+        if not u:
+            u = {"username": BOT_USER, "password_hash": generate_password_hash(secrets.token_hex(32)), "email": "", "phone": "",
+                 "show_email": False, "show_phone": False, "created_at": datetime.now(timezone.utc).isoformat()}
+            users[BOT_USER] = u
+        u.update(BOT_PROFILE)
+        write_json(USERS_FILE, users)
+
+
+def bot_send(gid, text, notify=True):
+    m = insert_message(gid, BOT_USER, text)
+    if notify:
+        socketio.emit("new_message", m, to=gid)
+    return m
+
+
+def onboard_bot_chat(username, notify=False):
+    """Give `username` its private chat with the bot (idempotent) and send the welcome messages once."""
+    if username == BOT_USER:
+        return
+    gid = dm_id(username, BOT_USER)
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        if gid not in groups:
+            groups[gid] = {"name": "", "description": "", "members": [username, BOT_USER], "owner": "", "type": "dm",
+                           "created_by": BOT_USER, "invite_code": secrets.token_urlsafe(12)}
+            write_json(GROUPS_FILE, groups)
+    if not q("SELECT 1 FROM messages WHERE group_id=? LIMIT 1", (gid,), one=True):
+        bot_send(gid, BOT_WELCOME, notify)
+        bot_send(gid, BOT_MENU, notify)
+
+
+def bot_respond(gid, text):
+    try:
+        t = str(text or "").translate(DIGITS).strip().lower().strip("«»\"'.!؟? ")
+        key = t if t in BOT_ANSWERS else BOT_ALIASES.get(t, "")
+        if key:
+            bot_send(gid, BOT_ANSWERS[key] + "\n\nبرای بازگشت به منو، «منو» را بفرستید.")
+        elif t in BOT_MENU_WORDS:
+            bot_send(gid, BOT_MENU)
+        else:
+            bot_send(gid, "متوجه پیامتان نشدم 🙏 لطفاً عدد یکی از گزینه‌های منو را بفرستید.\n\n" + BOT_MENU)
+    except Exception as e:
+        print("[bot] error:", repr(e))
 
 
 # ---------- pages ----------
@@ -776,6 +879,7 @@ def signup_verify():
                                   "show_email": False, "show_phone": False, "created_at": datetime.now(timezone.utc).isoformat()}
         write_json(USERS_FILE, users)
     pending.pop(token, None)
+    onboard_bot_chat(rec["username"])
     inv = login_user(rec["username"])
     return jsonify(ok=True, redirect=url_for("join_invite", invite_code=inv) if inv else url_for("chat"))
 
@@ -1186,6 +1290,8 @@ def deliver_message(username, gid, text, reply_to="", cid=""):
         for n in g["members"]:  # first message: the DM now appears in the other person's list
             socketio.emit("groups_snapshot", {"groups": my_groups(n), "users": visible_users(n)}, to="user:" + n)
     socketio.emit("new_message", m, to=gid)
+    if g.get("type") == "dm" and BOT_USER in g.get("members", []) and username != BOT_USER:
+        threading.Timer(0.6, bot_respond, (gid, text)).start()
     return m, ""
 
 
@@ -1275,6 +1381,10 @@ def on_forward_message(data):
     m = insert_message(target, username, row["text"], forwarded_from=shaped["display_name"])
     emit("new_message", m, to=target)
 
+
+ensure_bot()
+for _n in list(read_json(USERS_FILE, {})):
+    onboard_bot_chat(_n)
 
 startup_report()
 
