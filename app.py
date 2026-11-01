@@ -960,12 +960,15 @@ def forgot_start():
     rec = {"username": name or "", "valid": bool(name), "email": "", "phone": "", "code": new_code(),
            "exp": time.time() + CODE_TTL, "tries": 0, "sent_at": time.time()}
     out = {"ok": True}
+    if not name:
+        print(f"[reset] no account matches {ident!r} (users in database: {len(users)})")
     if name:
         u, em, ph = users[name], norm_email(ident), norm_phone(ident)
         if em and u.get("email") == em: rec["email"] = em            # reply on the channel the person typed
         elif ph and u.get("phone") == ph: rec["phone"] = ph
         elif u.get("email"): rec["email"] = u["email"]                # typed a username: email first, then phone
         else: rec["phone"] = u.get("phone", "")
+        print(f"[reset] account {name!r} found, sending code to {mask(rec['email'], rec['phone'])}")
         if not deliver_code(rec["email"], rec["phone"], rec["code"], "reset"):
             print(f"[reset] delivery failed for {name}")
             if DEV_CODES:
