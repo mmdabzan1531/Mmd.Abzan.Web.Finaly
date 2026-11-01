@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-keep-dir><head>{% include "_head.html" %}<title>Language | Chatroom</title></head>
+<body class="auth-body" data-no-i18n>
+{% include "_star.html" %}
+<div class="ig">
+<main class="ig-main">
+  <section class="ig-card">
+    <div class="ig-brand"><svg class="mark"><use href="#star"/></svg><h1>Chatroom</h1></div>
+    <h2 style="text-align:center;margin:6px 0 4px">Choose your language</h2>
+    <p class="ig-sub" style="text-align:center" dir="rtl">زبان خود را انتخاب کنید</p>
+    <div class="lang-grid">
+      {% for code, name in LANGS %}
+      <a class="ig-btn lang-btn{{ ' on' if code == current else '' }}" href="{{ url_for('set_lang', code=code, next=nxt) }}" lang="{{ code }}" dir="{{ 'rtl' if code in ('fa', 'ar') else 'ltr' }}">{{ name }}</a>
+      {% endfor %}
+    </div>
+  </section>
+</main>
+</div>
+<style>
+.lang-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.lang-btn{display:block;text-align:center;text-decoration:none;padding:14px 8px;box-sizing:border-box}
+.lang-btn.on{outline:2px solid currentColor;outline-offset:2px}
+</style>
+</body></html>
