@@ -1,4 +1,13 @@
-import base64, json, os, re, uuid, secrets, threading, random, sqlite3, hashlib, hmac, smtplib, ssl, copy
+import os, sys
+ASYNC_MODE = "threading"
+if os.environ.get("CHATROOM_ASYNC", "").strip() == "gevent" or "gevent" in sys.modules:
+    try:                                   # must run before any other import
+        from gevent import monkey
+        monkey.patch_all()
+        ASYNC_MODE = "gevent"
+    except ImportError:
+        print("[async] CHATROOM_ASYNC=gevent but gevent is not installed -> threading mode")
+import base64, json, re, uuid, secrets, threading, random, sqlite3, hashlib, hmac, smtplib, ssl, copy
 import urllib.request, urllib.parse, urllib.error
 from email.message import EmailMessage
 from collections import defaultdict, deque
@@ -85,7 +94,7 @@ app.jinja_env.globals["ASSET_V"] = str(int(time.time()))
 # ride on a visitor's login anyway. Set CHATROOM_CORS="https://my.site" to restrict.
 _cors = os.environ.get("CHATROOM_CORS", "*").strip()
 socketio = SocketIO(
-    app, async_mode="threading", ping_interval=20, ping_timeout=30,
+    app, async_mode=ASYNC_MODE, ping_interval=20, ping_timeout=30,
     cors_allowed_origins="*" if _cors in ("", "*") else [x.strip() for x in _cors.split(",") if x.strip()],
     max_http_buffer_size=64 * 1024,
 )
@@ -102,6 +111,9 @@ _kv_cache = {}          # key -> value (single process: write-through, so it is 
 if USE_PG:
     try:
         import psycopg2, psycopg2.pool, psycopg2.extras
+        if ASYNC_MODE == "gevent":
+            from psycogreen.gevent import patch_psycopg
+            patch_psycopg()
     except ImportError:
         raise SystemExit("DATABASE_URL is set but psycopg2 is not installed: add 'psycopg2-binary' to requirements.txt")
 
@@ -290,10 +302,16 @@ def fetch_one(mid):
 
 
 def insert_message(gid, username, text, reply_to="", forwarded_from=""):
-    mid = uuid.uuid4().hex
-    q("INSERT INTO messages(id,group_id,username,text,created_at,reply_to,forwarded_from) VALUES(?,?,?,?,?,?,?)",
-      (mid, gid, username, text, datetime.now(timezone.utc).isoformat(), reply_to, forwarded_from), commit=True)
-    return fetch_one(mid)[1]
+    mid, now = uuid.uuid4().hex, datetime.now(timezone.utc).isoformat()
+    rows = q("INSERT INTO messages(id,group_id,username,text,created_at,reply_to,forwarded_from) VALUES(?,?,?,?,?,?,?) RETURNING seq",
+             (mid, gid, username, text, now, reply_to, forwarded_from), commit=True)
+    row = {"id": mid, "seq": rows[0]["seq"], "group_id": gid, "username": username, "text": text, "created_at": now,
+           "edited": 0, "forwarded_from": forwarded_from, "reply_to": reply_to, "reply_text": None, "reply_user": None}
+    if reply_to:
+        parent = q("SELECT text, username FROM messages WHERE id=?", (reply_to,), one=True)
+        if parent:
+            row["reply_text"], row["reply_user"] = parent["text"], parent["username"]
+    return shape(row, read_json(USERS_FILE, {}))
 
 
 # ---------- helpers ----------
@@ -335,12 +353,22 @@ def last_msg(gid):
     return {"username": r["username"], "text": r["text"][:60], "created_at": r["created_at"], "seq": r["seq"]} if r else None
 
 
+def last_msgs(gids):
+    """Latest message of every group in a single query."""
+    gids = list(gids)
+    if not gids:
+        return {}
+    rows = q("SELECT m.group_id, m.username, m.text, m.created_at, m.seq FROM messages m JOIN "
+             "(SELECT group_id, MAX(seq) ms FROM messages WHERE group_id IN (" + ",".join("?" * len(gids)) + ") GROUP BY group_id) x "
+             "ON x.ms = m.seq", tuple(gids))
+    return {r["group_id"]: {"username": r["username"], "text": r["text"][:60], "created_at": r["created_at"], "seq": r["seq"]} for r in rows}
+
+
 def my_groups(username):
-    out = {}
-    for gid, g in read_json(GROUPS_FILE, {}).items():
-        if not is_member(g, username):
-            continue
-        d = public_group(g); d["last"] = last_msg(gid)
+    mine = {gid: g for gid, g in read_json(GROUPS_FILE, {}).items() if is_member(g, username)}
+    lasts, out = last_msgs(mine), {}
+    for gid, g in mine.items():
+        d = public_group(g); d["last"] = lasts.get(gid)
         if g.get("type") == "dm" and not d["last"] and g.get("created_by") != username:
             continue  # an empty DM stays invisible to the other person
         out[gid] = d
@@ -706,6 +734,7 @@ def new_code():
 
 
 def startup_report():
+    print("  async  :", ASYNC_MODE)
     print("\n  storage:", "Postgres (data is permanent)" if USE_PG else "local files (lost on every Render restart!)")
     print("\n  ---- verification codes ----")
     print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_APP_PASSWORD)")
@@ -1369,9 +1398,10 @@ def on_connect(auth=None):
         return False
     online_sids[request.sid] = username
     join_room("user:" + username)
-    for gid in my_groups(username):
+    groups = my_groups(username)
+    for gid in groups:
         join_room(gid)
-    emit("groups_snapshot", {"groups": my_groups(username)})
+    emit("groups_snapshot", {"groups": groups})
     broadcast_presence()
 
 
@@ -1388,12 +1418,12 @@ def on_sync(data):
     if not username:
         return
     last_read = (data or {}).get("last_read") or {}
-    counts = {}
-    for gid in my_groups(username):
-        seq = last_read.get(gid)
-        if isinstance(seq, int):
-            counts[gid] = q("SELECT COUNT(*) c FROM messages WHERE group_id=? AND seq>? AND username!=?",
-                            (gid, seq, username), one=True)["c"]
+    asked = [(gid, last_read[gid]) for gid in my_groups(username) if isinstance(last_read.get(gid), int)]
+    counts = {gid: 0 for gid, _ in asked}
+    if asked:
+        rows = q("SELECT group_id, COUNT(*) c FROM messages WHERE username!=? AND (" + " OR ".join(["(group_id=? AND seq>?)"] * len(asked))
+                 + ") GROUP BY group_id", (username,) + tuple(v for pair in asked for v in pair))
+        counts.update({r["group_id"]: r["c"] for r in rows})
     emit("unread", {"counts": counts})
 
 
@@ -1446,7 +1476,7 @@ def deliver_message(username, gid, text, reply_to="", cid=""):
             for k in [k for k, v in sent_cids.items() if now - v[1] > 600]:
                 sent_cids.pop(k, None)
         sent_cids[(username, cid)] = (m, now)
-    if g.get("type") == "dm" and q("SELECT COUNT(*) c FROM messages WHERE group_id=?", (gid,), one=True)["c"] == 1:
+    if g.get("type") == "dm" and len(q("SELECT 1 FROM messages WHERE group_id=? LIMIT 2", (gid,))) == 1:
         for n in g["members"]:  # first message: the DM now appears in the other person's list
             socketio.emit("groups_snapshot", {"groups": my_groups(n), "users": visible_users(n)}, to="user:" + n)
     socketio.emit("new_message", m, to=gid)
@@ -1568,4 +1598,5 @@ def lan_ip():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  Chatroom is running\n  This device : http://127.0.0.1:{port}\n  Same Wi-Fi  : http://{lan_ip()}:{port}\n")
-    socketio.run(app, host=os.environ.get("HOST", "0.0.0.0"), port=port, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host=os.environ.get("HOST", "0.0.0.0"), port=port, debug=False,
+                 **({"allow_unsafe_werkzeug": True} if ASYNC_MODE == "threading" else {}))
