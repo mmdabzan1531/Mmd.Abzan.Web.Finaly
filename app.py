@@ -380,7 +380,7 @@ def _http(url, data=None, headers=None, method=None, timeout=15):
 PURPOSE = {"signup": "تأیید ثبت‌نام", "reset": "بازیابی رمز عبور"}
 
 
-# --- email: Gmail / any SMTP, or Brevo HTTP API (for hosts that block SMTP ports) ---
+# --- email: Gmail API (HTTPS) -> SMTP -> Brevo ---
 def smtp_settings():
     if env("GMAIL_USER") and env("GMAIL_APP_PASSWORD"):
         return "smtp.gmail.com", 587, env("GMAIL_USER"), env("GMAIL_APP_PASSWORD").replace(" ", ""), env("GMAIL_USER")
@@ -398,66 +398,73 @@ def email_ready():
     return bool(gmail_api_ready() or smtp_settings() or (env("BREVO_API_KEY") and env("BREVO_SENDER")))
 
 
-def _gmail_api_send(msg):
-    """Send through the Gmail API over HTTPS (port 443) - works on hosts that block SMTP (e.g. Render free)."""
-    tok_body = urllib.parse.urlencode({
+def _send_gmail_api(to, subject, text, html):
+    # 1) access token from refresh token
+    status, out = _http("https://oauth2.googleapis.com/token", urllib.parse.urlencode({
         "client_id": env("GMAIL_CLIENT_ID"), "client_secret": env("GMAIL_CLIENT_SECRET"),
-        "refresh_token": env("GMAIL_REFRESH_TOKEN"), "grant_type": "refresh_token"}).encode()
-    st, out = _http("https://oauth2.googleapis.com/token", tok_body,
-                    {"Content-Type": "application/x-www-form-urlencoded"}, "POST")
-    if st != 200:
-        raise RuntimeError(f"token {st}: {out[:200]}")
-    access = json.loads(out)["access_token"]
+        "refresh_token": env("GMAIL_REFRESH_TOKEN"), "grant_type": "refresh_token"}).encode(),
+        {"Content-Type": "application/x-www-form-urlencoded"}, "POST")
+    if status != 200:
+        print("[email] Gmail token failed:", status, out[:200])
+        return False
+    token = json.loads(out).get("access_token", "")
+    # 2) build and send the message
+    msg = EmailMessage()
+    msg["Subject"], msg["To"], msg["From"] = subject, to, f"Chatroom <{env('GMAIL_USER')}>"
+    msg.set_content(text)
+    msg.add_alternative(html, subtype="html")
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    st, out = _http("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-                    json.dumps({"raw": raw}).encode(),
-                    {"Authorization": "Bearer " + access, "Content-Type": "application/json"}, "POST")
-    if not 200 <= st < 300:
-        raise RuntimeError(f"send {st}: {out[:200]}")
+    status, out = _http("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                        json.dumps({"raw": raw}).encode(),
+                        {"Authorization": "Bearer " + token, "Content-Type": "application/json"}, "POST")
+    if 200 <= status < 300:
+        print("[email] sent via Gmail API ->", to)
+        return True
+    print("[email] Gmail API failed:", status, out[:200])
+    return False
 
 
 def send_email(to, code, purpose="signup"):
     title = PURPOSE.get(purpose, "کد تأیید")
-    subject = f"{code} — کد تأیید Chatroom"
-    text = f"{title}\nکد تأیید شما در Chatroom: {code}\nاین کد تا ۵ دقیقه معتبر است. اگر خودت درخواست نکرده‌ای این پیام را نادیده بگیر و کد را به کسی نده."
-    html = (f'<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:420px;margin:auto;padding:24px;border:1px solid #e5e5e5;'
-            f'border-radius:14px;text-align:center"><h2 style="margin:0 0 6px">Chatroom</h2><p style="color:#666;margin:0 0 18px">{title}</p>'
-            f'<div style="font-size:34px;letter-spacing:8px;font-weight:700;direction:ltr;background:#f4f4f6;border-radius:12px;padding:14px">{code}</div>'
-            f'<p style="color:#888;font-size:13px;margin-top:16px;line-height:1.9">این کد تا ۵ دقیقه معتبر است.<br>اگر خودت درخواست نکرده‌ای این ایمیل را نادیده بگیر و کد را به کسی نده.</p></div>')
-    def build(sender):
-        msg = EmailMessage()
-        msg["Subject"], msg["To"], msg["From"] = subject, to, f"Chatroom <{sender}>" if sender else ""
-        msg.set_content(text)
-        msg.add_alternative(html, subtype="html")
-        return msg
+    subject = "کد تأیید Chatroom"            # no code / emoji in the subject: looks less like spam
+    text = (f"سلام،\n{title} در Chatroom\n\nکد تأیید شما: {code}\n\n"
+            "این کد تا ۵ دقیقه معتبر است. اگر خودت درخواست نکرده‌ای، این پیام را نادیده بگیر.")
+    html = (f'<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:420px;margin:auto;padding:20px;text-align:center">'
+            f'<p style="margin:0 0 12px">سلام، {title} در Chatroom</p>'
+            f'<p style="margin:0 0 6px">کد تأیید شما:</p>'
+            f'<p style="font-size:30px;letter-spacing:6px;font-weight:700;direction:ltr;margin:0 0 14px">{code}</p>'
+            f'<p style="color:#666;font-size:13px;line-height:1.9;margin:0">این کد تا ۵ دقیقه معتبر است.<br>'
+            f'اگر خودت درخواست نکرده‌ای، این پیام را نادیده بگیر.</p></div>')
 
     if gmail_api_ready():
         try:
-            _gmail_api_send(build(env("GMAIL_USER")))
-            print("[email] sent via Gmail API ->", to)
-            return True
+            if _send_gmail_api(to, subject, text, html):
+                return True
         except Exception as e:
-            print("[email] Gmail API failed:", repr(e))
+            print("[email] Gmail API error:", repr(e))
+
     cfg = smtp_settings()
     if cfg:
         host, port, user, pwd, sender = cfg
-        ctx = ssl.create_default_context()
-        for p in ([port, 465] if port != 465 else [465]):      # try 587 (STARTTLS), then 465 (SSL)
-            try:
-                msg = build(sender)
-                if p == 465:
-                    with smtplib.SMTP_SSL(host, p, timeout=15, context=ctx) as srv:
-                        if user: srv.login(user, pwd)
-                        srv.send_message(msg)
-                else:
-                    with smtplib.SMTP(host, p, timeout=15) as srv:
-                        srv.ehlo(); srv.starttls(context=ctx); srv.ehlo()
-                        if user: srv.login(user, pwd)
-                        srv.send_message(msg)
-                print(f"[email] sent via SMTP:{p} ->", to)
-                return True
-            except Exception as e:
-                print(f"[email] SMTP:{p} failed:", repr(e))
+        try:
+            msg = EmailMessage()
+            msg["Subject"], msg["To"], msg["From"] = subject, to, f"Chatroom <{sender}>" if sender else ""
+            msg.set_content(text)
+            msg.add_alternative(html, subtype="html")
+            ctx = ssl.create_default_context()
+            if port == 465:
+                with smtplib.SMTP_SSL(host, port, timeout=15, context=ctx) as s:
+                    if user: s.login(user, pwd)
+                    s.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=15) as s:
+                    s.ehlo(); s.starttls(context=ctx); s.ehlo()
+                    if user: s.login(user, pwd)
+                    s.send_message(msg)
+            return True
+        except Exception as e:
+            print("[email] SMTP failed:", repr(e))
+
     if env("BREVO_API_KEY") and env("BREVO_SENDER"):
         try:
             body = json.dumps({"sender": {"name": "Chatroom", "email": env("BREVO_SENDER")}, "to": [{"email": to}],
@@ -562,7 +569,7 @@ def channel_missing(email, phone):
     if DEV_CODES:
         return ""
     if email and not email_ready():
-        return "ارسال ایمیل روی این سرور تنظیم نشده است؛ مدیر سایت باید Gmail یا SMTP را تنظیم کند."
+        return "ارسال ایمیل روی این سرور تنظیم نشده است؛ مدیر سایت باید ارسال ایمیل را تنظیم کند."
     if phone and not sms_ready_for(phone):
         return ("ارسال پیامک برای این شماره روی سرور تنظیم نشده است؛ مدیر سایت باید سرویس پیامک را تنظیم کند."
                 if phone.startswith("09") else "برای شماره‌های خارجی، سرویس پیامک بین‌المللی (Twilio) باید تنظیم شود. می‌توانی با ایمیل ثبت‌نام کنی.")
@@ -575,7 +582,7 @@ def new_code():
 
 def startup_report():
     print("\n  ---- verification codes ----")
-    print("  email :", "READY" if email_ready() else "NOT configured (set GMAIL_USER + GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN, or GMAIL_APP_PASSWORD)")
+    print("  email :", ("READY (" + ("Gmail API" if gmail_api_ready() else "SMTP" if smtp_settings() else "Brevo") + ")") if email_ready() else "NOT configured (set GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN + GMAIL_USER, or BREVO_API_KEY + BREVO_SENDER)")
     print("  sms   :", "READY" if sms_ready() else "NOT configured (set KAVENEGAR_KEY / SMSIR_KEY / TWILIO_*)")
     if DEV_CODES:
         print("  !! CHATROOM_DEV_CODES=1 -> codes are shown on screen. Never use this on a public server.")
