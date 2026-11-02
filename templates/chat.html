@@ -25,9 +25,9 @@
     <div class="ctx" id="ctx-bar" hidden><div><b id="ctx-kind"></b><span id="ctx-text" data-no-i18n></span></div><button type="button" class="key round small" id="cancel-ctx" aria-label="لغو">✕</button></div>
     <div class="attach-bar" id="attach-bar" hidden><span class="attach-ico" id="attach-ico">📎</span><div class="attach-info" data-no-i18n><b id="attach-name"></b><small id="attach-size"></small></div><button type="button" class="key round small" id="attach-cancel" aria-label="لغو">✕</button></div>
     <form class="composer" id="message-form">
-      <button type="button" class="key round attach-btn" id="attach-btn" aria-label="پیوست" data-pp-toggle>📎</button><input type="file" id="attach-input" hidden>
+      <button type="button" class="key round attach-btn" id="attach-btn" aria-label="پیوست" data-pp-toggle data-no-emoji><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button><input type="file" id="attach-input" hidden>
       <textarea id="message-input" dir="auto" rows="1" maxlength="1000" placeholder="پیامت را بنویس…" aria-label="متن پیام"></textarea>
-      <button type="button" class="key round emoji-btn" id="emoji-btn" aria-label="ایموجی" data-pp-toggle>😊</button>
+      <button type="button" class="key round emoji-btn" id="emoji-btn" aria-label="ایموجی" data-pp-toggle data-no-emoji><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><circle cx="9" cy="10" r=".6" fill="currentColor"/><circle cx="15" cy="10" r=".6" fill="currentColor"/><path d="M8.3 14.4c.9 1.5 2.2 2.2 3.7 2.2s2.8-.7 3.7-2.2"/></svg></button>
       <button class="key hot round send" type="submit" id="send-button" aria-label="ارسال">➤</button>
     </form>
   </main>
