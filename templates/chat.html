@@ -53,14 +53,24 @@
   <div class="actions"><button class="key" data-close="profile-modal">بستن</button><button class="key hot" id="save-profile">ذخیره</button></div><p class="status" id="profile-status"></p></section></div>
 <div class="modal" id="user-view-modal"><section class="card center"><div class="avatar xl" id="view-user-avatar">🙂</div><h2 id="view-user-name" data-no-i18n></h2><p class="handle" id="view-user-id" data-no-i18n></p><p class="bio" id="view-user-bio" data-no-i18n></p><div class="contact" id="view-contact"></div><div class="actions"><button class="key" data-close="user-view-modal">بستن</button><button class="key hot" id="view-dm">ارسال پیام</button></div></section></div>
 <div class="modal" id="create-group-modal"><section class="card"><h2>گروه جدید</h2><label>نام گروه</label><input id="new-group-name" maxlength="40" placeholder="مثلاً گپ برنامه‌نویسی"><label>توضیحات</label><textarea id="new-group-description" maxlength="180" rows="3"></textarea><div class="actions"><button class="key" data-close="create-group-modal">بستن</button><button class="key hot" id="create-group-submit">ساخت گروه</button></div><p class="status" id="create-group-status"></p></section></div>
-<div class="modal" id="group-modal"><section class="card"><h2>تنظیمات گروه</h2><label>نام گروه</label><input id="edit-group-name" maxlength="40"><label>توضیحات</label><textarea id="edit-group-description" maxlength="180" rows="3"></textarea><label>لینک دعوت</label><div class="row"><input id="group-invite-url" readonly placeholder="روی «لینک دعوت» بزن"><button type="button" class="key" id="copy-invite">کپی</button></div><div id="banned-wrap" hidden><label>مسدودشده‌ها</label><div id="banned-list" class="banned-list"></div></div><div class="row2 group-extra"><button type="button" class="key small" id="reset-invite">لینک دعوت جدید</button><button type="button" class="key small" id="leave-group">ترک گروه</button><button type="button" class="key small del" id="delete-group">حذف گروه</button></div><div class="actions"><button class="key" data-close="group-modal">بستن</button><button class="key hot" id="save-group">ذخیره</button></div><p class="status" id="group-status"></p></section></div>
+<div class="modal" id="group-modal"><section class="card"><h2>تنظیمات گروه</h2>
+  <div style="display:flex;justify-content:center;margin:4px 0 12px"><div class="avatar xl" id="group-photo-preview">👥</div></div>
+  <div id="group-photo-wrap"><label>عکس گروه</label><input id="group-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small>PNG، JPG، WEBP یا GIF تا ۴ مگابایت</small>
+  <div class="row2"><button type="button" class="key small del" id="group-photo-remove">حذف عکس</button></div></div>
+  <label>نام گروه</label><input id="edit-group-name" maxlength="40">
+  <label>توضیحات</label><textarea id="edit-group-description" maxlength="180" rows="3"></textarea>
+  <input id="group-invite-url" type="hidden"><button type="button" id="copy-invite" hidden aria-hidden="true" tabindex="-1"></button>
+  <div id="banned-wrap" hidden><label>مسدودشده‌ها</label><div id="banned-list" class="banned-list"></div></div>
+  <div class="row2 group-extra"><button type="button" class="key small" id="reset-invite">لینک دعوت جدید</button><button type="button" class="key small" id="leave-group">ترک گروه</button><button type="button" class="key small del" id="delete-group">حذف گروه</button></div>
+  <div class="actions"><button class="key" data-close="group-modal">بستن</button><button class="key hot" id="save-group">ذخیره</button></div><p class="status" id="group-status"></p></section></div>
 <div class="modal" id="sheet"><section class="card"><h2 id="sheet-title"></h2><div id="sheet-body"></div><div class="actions" id="sheet-actions"></div></section></div>
 
 <script>
 window.CHATROOM = {
   username: {{ current_user.username|tojson }}, me: {{ current_user|tojson }},
   initialUsers: {{ users|tojson }}, initialGroups: {{ groups|tojson }},
-  initialGroup: {{ request.args.get("group", "")|tojson }}
+  initialGroup: {{ request.args.get("group", "")|tojson }},
+  maxFileMb: {{ max_file_mb|default(15)|tojson }}
 };
 </script>
 <script>
