@@ -1,31 +1,9 @@
 (function () {
   "use strict";
   /* استایل‌ها داخل همین فایل هستند تا به فایل CSS جدا وابسته نباشد */
-  (function () { var s = document.createElement("style"); s.id = "pp-style"; s.textContent = "/* ===== اعضا: پنل کشویی از سمت راست ===== */\n#people.people{position:fixed!important;top:0;bottom:0;right:0;left:auto!important;width:min(340px,88vw)!important;max-width:100vw;height:100dvh;margin:0!important;\n  transform:translateX(105%)!important;visibility:hidden;transition:transform .26s ease,visibility .26s;z-index:80;display:flex!important;flex-direction:column;\n  background:var(--panel,var(--night,#0d0d14));color:inherit;border-left:1px solid rgba(255,255,255,.12);box-shadow:-8px 0 30px rgba(0,0,0,.45);overflow:hidden}\n#people.people.pp-open{transform:none!important;visibility:visible}\n#people .members{flex:1;overflow-y:auto;min-height:0}\n#people .people-head{display:flex;align-items:center;gap:8px}\n#people #close-members{display:inline-flex!important;margin-inline-start:auto}\n#pp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:79;opacity:0;pointer-events:none;transition:opacity .25s}\n#pp-backdrop.show{opacity:1;pointer-events:auto}\n.app.pp-grid{grid-template-columns:var(--pp-side) minmax(0,1fr)!important}\n\n/* ===== نوار پیام ===== */\n.composer{align-items:flex-end}\n.composer .emoji-btn,.composer .attach-btn{flex:0 0 auto;font-size:1.15rem}\n.composer textarea{flex:1;min-width:0}\n\n/* ===== پنل ایموجی ===== */\n.pp-pop{position:fixed;z-index:2147483000;background:var(--panel,var(--night,#14141c));color:inherit;border:1px solid rgba(255,255,255,.14);\n  border-radius:16px;box-shadow:0 10px 36px rgba(0,0,0,.5);animation:ppIn .14s ease}\n@keyframes ppIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}\n.ep{width:min(340px,94vw);display:flex;flex-direction:column;overflow:hidden}\n.ep-tabs{display:flex;gap:2px;padding:6px;border-bottom:1px solid rgba(255,255,255,.1);overflow-x:auto}\n.ep-tabs button{flex:1 0 auto;background:none;border:0;border-radius:10px;padding:6px 8px;font-size:1.15rem;cursor:pointer;opacity:.6;color:inherit}\n.ep-tabs button.on{opacity:1;background:rgba(255,255,255,.12)}\n.ep-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:8px;height:230px;overflow-y:auto;align-content:start}\n.ep-grid button{background:none;border:0;border-radius:8px;font-size:1.45rem;line-height:1;padding:6px 0;cursor:pointer}\n.ep-grid button:hover,.ep-grid button:active{background:rgba(255,255,255,.14)}\n.ep-empty{grid-column:1/-1;text-align:center;opacity:.6;padding:30px 0;font-size:.9rem}\n\n/* ===== منوی پیوست ===== */\n.am{min-width:210px;padding:6px;display:flex;flex-direction:column}\n.am button{display:flex;align-items:center;gap:12px;background:none;border:0;color:inherit;font:inherit;text-align:start;padding:10px 12px;border-radius:12px;cursor:pointer}\n.am button:hover,.am button:active{background:rgba(255,255,255,.12)}\n.am button i{font-style:normal;font-size:1.3rem;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1)}\n\n/* ===== واکنش به پیام ===== */\n.rx-host{position:relative}\n.rx-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}\n.rx-row:empty{display:none}\n.rx-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:inherit;\n  border-radius:999px;padding:2px 8px;font-size:.9rem;line-height:1.5;cursor:pointer;font-family:inherit}\n.rx-chip b{font-size:.78rem;font-weight:500;opacity:.85}\n.rx-chip.mine{background:rgba(255,200,60,.22);border-color:rgba(255,200,60,.65)}\n.rx-add{position:absolute;top:-6px;inset-inline-end:4px;width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.2);\n  background:var(--panel,var(--night,#1a1a24));color:inherit;font-size:.85rem;display:grid;place-items:center;cursor:pointer;opacity:0;transition:opacity .15s;padding:0;z-index:3}\n.rx-host:hover>.rx-add,.rx-add:focus-visible{opacity:1}\n@media (hover:none){.rx-add{opacity:.55}}\n.rq{display:flex;align-items:center;gap:2px;padding:6px 8px;border-radius:999px}\n.rq button{background:none;border:0;font-size:1.55rem;line-height:1;padding:4px 5px;border-radius:50%;cursor:pointer;transition:transform .12s}\n.rq button:hover,.rq button:active{transform:scale(1.25)}\n.pp-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:999px;z-index:120;font-size:.9rem}\n\n/* ایموجی‌های آیفون (اندازه قفل‌شده تا هیچ استایل دیگری خرابش نکند) */\nimg.ap-emoji{display:inline-block!important;width:min(1.2em,32px)!important;height:min(1.2em,32px)!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;\n  margin:0 .04em!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;\n  vertical-align:-.2em!important;object-fit:contain!important;aspect-ratio:1/1;-webkit-user-drag:none;user-select:none;pointer-events:none;flex:none}\n.ep-grid button img.ap-emoji,.ep-tabs button img.ap-emoji{width:1.5rem!important;height:1.5rem!important;vertical-align:middle!important;margin:0!important}\n.rq button img.ap-emoji{width:1.7rem!important;height:1.7rem!important;vertical-align:middle!important;margin:0!important}\n.rx-chip img.ap-emoji{width:1.1em!important;height:1.1em!important;vertical-align:middle!important}\n.side-nav i img.ap-emoji{width:1.25em!important;height:1.25em!important}\n\n/* دکمه‌های ایموجی و سنجاق: آیکن خطی ساده */\n.emoji-btn,.attach-btn{display:inline-grid;place-items:center;padding:0;color:inherit;opacity:.82;transition:color .15s,opacity .15s,transform .15s}\n.emoji-btn svg,.attach-btn svg{width:22px;height:22px;display:block;pointer-events:none}\n.emoji-btn:hover,.attach-btn:hover,.emoji-btn:focus-visible,.attach-btn:focus-visible{opacity:1;color:#9b8cff}\n.emoji-btn:active,.attach-btn:active{transform:scale(.92)}\n.rx-add svg{width:15px;height:15px;display:block}\n\n/* پنل ایموجی چسبیده بالای نوار پیام */\n.ep.dock{max-width:none;border-radius:16px}\n.ep.dock .ep-grid{height:min(300px,38vh);grid-template-columns:repeat(auto-fill,minmax(40px,1fr))}\n.am{max-height:72vh;overflow-y:auto}\n\n/* کارت‌های موقعیت / مخاطب / نظرسنجی */\n.pp-card{display:block;min-width:220px;max-width:100%;padding:8px;border-radius:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);text-align:start}\n.pp-card-top{display:flex;align-items:center;gap:10px}\n.pp-card-top b{display:block}.pp-card-top small{opacity:.75}\n.pp-ico{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:1.4rem;background:rgba(255,255,255,.12);flex:0 0 auto}\n.pp-card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}\n.pp-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:inherit;font:inherit;font-size:.88rem;cursor:pointer;text-decoration:none}\n.pp-btn:hover{background:rgba(255,255,255,.16)}\n.pp-btn.hot{background:#f5b82e;color:#111;border-color:#f5b82e;font-weight:600}\n.pp-poll-q{font-weight:700;margin-bottom:2px}\n.pp-poll-hint,.pp-poll-total{display:block;opacity:.65;font-size:.78rem;margin:2px 0 6px}\n.pp-opt{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:4px 0;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:inherit;font:inherit;text-align:start;cursor:pointer;overflow:hidden}\n.pp-opt.mine{border-color:#f5b82e}\n.pp-bar{position:absolute;inset-block:0;inset-inline-start:0;background:rgba(245,184,46,.28);transition:width .3s;z-index:0}\n.pp-opt-t,.pp-opt-n{position:relative;z-index:1}.pp-opt-n{font-size:.78rem;opacity:.85;white-space:nowrap}\n\n/* پنجره‌ی ورودی (نظرسنجی / مخاطب) */\n.pp-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:110;display:grid;place-items:center;padding:16px}\n.pp-modal{width:min(380px,100%);max-height:88vh;overflow:auto;background:var(--panel,var(--night,#14141c));color:inherit;border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:16px;box-shadow:0 14px 50px rgba(0,0,0,.6)}\n.pp-modal h3{margin:0 0 10px}\n.pp-field{display:block;margin:8px 0}\n.pp-field span{display:block;font-size:.82rem;opacity:.75;margin-bottom:4px}\n.pp-field input{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:inherit;font:inherit}\n.pp-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}\n.pp-modal .pp-btn{margin-top:6px}.pp-actions .pp-btn{margin-top:0}\n\n/* ===== پنل ایموجی (سبک تلگرام) ===== */\n.ep.dock{display:flex;flex-direction:column;border-radius:18px 18px 14px 14px;background:var(--panel,var(--night,#15151d))}\n.ep.dock .ep-grid{height:min(290px,40vh);grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:0;padding:8px 6px}\n.ep.dock .ep-grid button{font-size:1.7rem;padding:7px 0;border-radius:12px}\n.ep.dock .ep-tabs{border-bottom:0;border-top:1px solid rgba(255,255,255,.1);justify-content:space-around;padding:4px 6px}\n.ep.dock .ep-tabs button{font-size:1.25rem;flex:1;opacity:.5}\n.ep.dock .ep-tabs button.on{opacity:1;background:rgba(155,140,255,.2)}\n\n/* ===== شیت پیوست (سبک تلگرام / بله) ===== */\n.pp-sheet-bg{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;animation:ppFade .18s ease}\n@keyframes ppFade{from{opacity:0}to{opacity:1}}\n@keyframes ppUp{from{transform:translateY(100%)}to{transform:none}}\n.pp-sheet{width:min(520px,100%);background:var(--panel,var(--night,#15151d));color:inherit;border-radius:22px 22px 0 0;padding:8px 14px calc(20px + env(safe-area-inset-bottom,0px));\n  box-shadow:0 -10px 40px rgba(0,0,0,.5);animation:ppUp .24s cubic-bezier(.2,.8,.2,1)}\n.pp-grab{width:42px;height:4px;border-radius:4px;background:rgba(255,255,255,.28);margin:4px auto 14px}\n.pp-attach-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 6px}\n.pp-att{display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:2px 0}\n.pp-att-ic{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .12s}\n.pp-att:active .pp-att-ic{transform:scale(.9)}\n.pp-att-ic svg{width:27px;height:27px}\n.pp-att-t{font-size:.8rem;opacity:.85}\n.pp-modal-bg{z-index:2147483100}\n"; (document.head || document.documentElement).appendChild(s); })();
+  (function () { var s = document.createElement("style"); s.id = "pp-style"; s.textContent = "/* ===== اعضا: پنل کشویی از سمت راست ===== */\n#people.people{position:fixed!important;top:0;bottom:0;right:0;left:auto!important;width:min(340px,88vw)!important;max-width:100vw;height:100dvh;margin:0!important;\n  transform:translateX(105%)!important;visibility:hidden;transition:transform .26s ease,visibility .26s;z-index:80;display:flex!important;flex-direction:column;\n  background:var(--panel,var(--night,#0d0d14));color:inherit;border-left:1px solid rgba(255,255,255,.12);box-shadow:-8px 0 30px rgba(0,0,0,.45);overflow:hidden}\n#people.people.pp-open{transform:none!important;visibility:visible}\n#people .members{flex:1;overflow-y:auto;min-height:0}\n#people .people-head{display:flex;align-items:center;gap:8px}\n#people #close-members{display:inline-flex!important;margin-inline-start:auto}\n#pp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:79;opacity:0;pointer-events:none;transition:opacity .25s}\n#pp-backdrop.show{opacity:1;pointer-events:auto}\n.app.pp-grid{grid-template-columns:var(--pp-side) minmax(0,1fr)!important}\n\n/* ===== نوار پیام ===== */\n.composer{align-items:flex-end}\n.composer .emoji-btn,.composer .attach-btn{flex:0 0 auto;font-size:1.15rem}\n.composer textarea{flex:1;min-width:0}\n\n/* ===== پنل ایموجی ===== */\n.pp-pop{position:fixed;z-index:2147483000;background:var(--panel,var(--night,#14141c));color:inherit;border:1px solid rgba(255,255,255,.14);\n  border-radius:16px;box-shadow:0 10px 36px rgba(0,0,0,.5);animation:ppIn .14s ease}\n@keyframes ppIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}\n.ep{width:min(340px,94vw);display:flex;flex-direction:column;overflow:hidden}\n.ep-tabs{display:flex;gap:2px;padding:6px;border-bottom:1px solid rgba(255,255,255,.1);overflow-x:auto}\n.ep-tabs button{flex:1 0 auto;background:none;border:0;border-radius:10px;padding:6px 8px;font-size:1.15rem;cursor:pointer;opacity:.6;color:inherit}\n.ep-tabs button.on{opacity:1;background:rgba(255,255,255,.12)}\n.ep-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:8px;height:230px;overflow-y:auto;align-content:start}\n.ep-grid button{background:none;border:0;border-radius:8px;font-size:1.45rem;line-height:1;padding:6px 0;cursor:pointer}\n.ep-grid button:hover,.ep-grid button:active{background:rgba(255,255,255,.14)}\n.ep-empty{grid-column:1/-1;text-align:center;opacity:.6;padding:30px 0;font-size:.9rem}\n\n/* ===== منوی پیوست ===== */\n.am{min-width:210px;padding:6px;display:flex;flex-direction:column}\n.am button{display:flex;align-items:center;gap:12px;background:none;border:0;color:inherit;font:inherit;text-align:start;padding:10px 12px;border-radius:12px;cursor:pointer}\n.am button:hover,.am button:active{background:rgba(255,255,255,.12)}\n.am button i{font-style:normal;font-size:1.3rem;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1)}\n\n.pp-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:999px;z-index:2147483200;font-size:.9rem}\n\n/* ایموجی‌های آیفون (اندازه قفل‌شده تا هیچ استایل دیگری خرابش نکند) */\nimg.ap-emoji{display:inline-block!important;width:min(1.2em,32px)!important;height:min(1.2em,32px)!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;\n  margin:0 .04em!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;\n  vertical-align:-.2em!important;object-fit:contain!important;aspect-ratio:1/1;-webkit-user-drag:none;user-select:none;pointer-events:none;flex:none}\n.ep-grid button img.ap-emoji,.ep-tabs button img.ap-emoji{width:1.5rem!important;height:1.5rem!important;vertical-align:middle!important;margin:0!important}\n.side-nav i img.ap-emoji{width:1.25em!important;height:1.25em!important}\n\n/* دکمه‌های ایموجی و سنجاق: آیکن خطی ساده */\n.emoji-btn,.attach-btn{display:inline-grid;place-items:center;padding:0;color:inherit;opacity:.82;transition:color .15s,opacity .15s,transform .15s}\n.emoji-btn svg,.attach-btn svg{width:22px;height:22px;display:block;pointer-events:none}\n.emoji-btn:hover,.attach-btn:hover,.emoji-btn:focus-visible,.attach-btn:focus-visible{opacity:1;color:#9b8cff}\n.emoji-btn:active,.attach-btn:active{transform:scale(.92)}\n\n/* پنل ایموجی چسبیده بالای نوار پیام */\n.ep.dock{max-width:none;border-radius:16px}\n.ep.dock .ep-grid{height:min(300px,38vh);grid-template-columns:repeat(auto-fill,minmax(40px,1fr))}\n.am{max-height:72vh;overflow-y:auto}\n\n/* کارت‌های موقعیت / مخاطب / نظرسنجی */\n.pp-card{display:block;min-width:220px;max-width:100%;padding:8px;border-radius:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);text-align:start}\n.pp-card-top{display:flex;align-items:center;gap:10px}\n.pp-card-top b{display:block}.pp-card-top small{opacity:.75}\n.pp-ico{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:1.4rem;background:rgba(255,255,255,.12);flex:0 0 auto}\n.pp-card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}\n.pp-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:inherit;font:inherit;font-size:.88rem;cursor:pointer;text-decoration:none}\n.pp-btn:hover{background:rgba(255,255,255,.16)}\n.pp-btn.hot{background:#f5b82e;color:#111;border-color:#f5b82e;font-weight:600}\n.pp-poll-q{font-weight:700;margin-bottom:2px}\n.pp-poll-hint,.pp-poll-total{display:block;opacity:.65;font-size:.78rem;margin:2px 0 6px}\n.pp-opt{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:4px 0;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:inherit;font:inherit;text-align:start;cursor:pointer;overflow:hidden}\n.pp-opt.mine{border-color:#f5b82e}\n.pp-bar{position:absolute;inset-block:0;inset-inline-start:0;background:rgba(245,184,46,.28);transition:width .3s;z-index:0}\n.pp-opt-t,.pp-opt-n{position:relative;z-index:1}.pp-opt-n{font-size:.78rem;opacity:.85;white-space:nowrap}\n\n/* پنجره‌ی ورودی (نظرسنجی / مخاطب) */\n.pp-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:110;display:grid;place-items:center;padding:16px}\n.pp-modal{width:min(380px,100%);max-height:88vh;overflow:auto;background:var(--panel,var(--night,#14141c));color:inherit;border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:16px;box-shadow:0 14px 50px rgba(0,0,0,.6)}\n.pp-modal h3{margin:0 0 10px}\n.pp-field{display:block;margin:8px 0}\n.pp-field span{display:block;font-size:.82rem;opacity:.75;margin-bottom:4px}\n.pp-field input{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:inherit;font:inherit}\n.pp-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}\n.pp-modal .pp-btn{margin-top:6px}.pp-actions .pp-btn{margin-top:0}\n\n/* ===== پنل ایموجی (سبک تلگرام) ===== */\n.ep.dock{display:flex;flex-direction:column;border-radius:18px 18px 14px 14px;background:var(--panel,var(--night,#15151d))}\n.ep.dock .ep-grid{height:min(290px,40vh);grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:0;padding:8px 6px}\n.ep.dock .ep-grid button{font-size:1.7rem;padding:7px 0;border-radius:12px}\n.ep.dock .ep-tabs{border-bottom:0;border-top:1px solid rgba(255,255,255,.1);justify-content:space-around;padding:4px 6px}\n.ep.dock .ep-tabs button{font-size:1.25rem;flex:1;opacity:.5}\n.ep.dock .ep-tabs button.on{opacity:1;background:rgba(155,140,255,.2)}\n\n/* ===== شیت پیوست (سبک تلگرام / بله) ===== */\n.pp-sheet-bg{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;animation:ppFade .18s ease}\n@keyframes ppFade{from{opacity:0}to{opacity:1}}\n@keyframes ppUp{from{transform:translateY(100%)}to{transform:none}}\n.pp-sheet{width:min(520px,100%);background:var(--panel,var(--night,#15151d));color:inherit;border-radius:22px 22px 0 0;padding:8px 14px calc(20px + env(safe-area-inset-bottom,0px));\n  box-shadow:0 -10px 40px rgba(0,0,0,.5);animation:ppUp .24s cubic-bezier(.2,.8,.2,1)}\n.pp-grab{width:42px;height:4px;border-radius:4px;background:rgba(255,255,255,.28);margin:4px auto 14px}\n.pp-attach-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 6px}\n.pp-att{display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:2px 0}\n.pp-att-ic{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .12s}\n.pp-att:active .pp-att-ic{transform:scale(.9)}\n.pp-att-ic svg{width:27px;height:27px}\n.pp-att-t{font-size:.8rem;opacity:.85}\n.pp-modal-bg{z-index:2147483100}\n"; (document.head || document.documentElement).appendChild(s); })();
 
-  (function () { var s = document.createElement("style"); s.id = "pp-style2"; s.textContent = ".rx-add{display:none!important}" +
-    ".rx-row{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 2px;width:100%;flex:1 1 100%;justify-content:flex-start;position:static}" +
-    ".rx-chip{padding:2px 9px;font-size:.95rem;background:rgba(255,255,255,.14);border-color:transparent}" +
-    ".rx-chip.mine{background:rgba(155,140,255,.4);border-color:rgba(190,175,255,.8)}" +
-    /* ===== ری‌اکشن به سبک تلگرام: داخل حباب، بالای ردیف ساعت، سمت چپ ===== */
-    ".rx-bubble>.rx-row{position:static;display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 3px;width:auto;flex:none;direction:ltr;justify-content:flex-start}" +
-    ".rx-bubble>.rx-row .rx-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 8px;border:0;border-radius:999px;color:inherit;" +
-      "background:rgba(255,255,255,.17);font-size:.9rem;line-height:1;animation:rxIn .28s cubic-bezier(.2,1.5,.4,1);transition:transform .15s,background .2s}" +
-    ".rx-bubble>.rx-row .rx-chip.mine{background:linear-gradient(135deg,#9a8bff,#5a44e8);color:#fff;box-shadow:0 3px 12px rgba(110,90,250,.45)}" +
-    ".rx-bubble>.rx-row .rx-chip:active{transform:scale(.9)}" +
-    ".rx-chip .rx-e{font-size:1.15rem;line-height:1}" +
-    ".rx-chip .rx-n{font-weight:700;font-size:.8rem}" +
-    ".rx-avs{display:inline-flex;direction:ltr;align-items:center}" +
-    ".rx-av{width:20px;height:20px;border-radius:50%;margin-left:-7px;display:grid;place-items:center;overflow:hidden;font-size:.62rem;font-weight:700;line-height:1;color:#fff;" +
-      "background:linear-gradient(135deg,#6b5bd6,#3b2f8f);border:1.5px solid rgba(20,18,38,.85)}" +
-    ".rx-av:first-child{margin-left:0}.rx-av img{width:100%;height:100%;object-fit:cover;display:block}" +
-    "@keyframes rxIn{from{transform:scale(.55);opacity:0}to{transform:none;opacity:1}}" +
-    ".rq{gap:2px;padding:6px 8px;border-radius:999px;background:rgba(30,30,42,.97);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);animation:ppIn .14s ease}" +
-    ".rq button{font-size:1.7rem;padding:3px 4px;line-height:1;color:inherit}" +
-    ".rq button.mine{background:rgba(155,140,255,.3);border-radius:50%}" +
-    ".rq button.rq-more{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;padding:0;margin-inline-start:2px;font-size:1rem}";
-    (document.head || document.documentElement).appendChild(s); })();
-  var $ = function (s, r) { return (r || document).querySelector(s); };
+    var $ = function (s, r) { return (r || document).querySelector(s); };
   var ME = (window.CHATROOM && window.CHATROOM.username) || "";
   var QUICK = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥"];
   var CATS = [
@@ -243,8 +221,7 @@
     document.body.appendChild(bg); openPop = bg;
   }, true);
 
-  /* ---------- واکنش به پیام‌ها ---------- */
-  var cache = {}, texts = {}, hosts = {}, pending = {}, timer = null;
+  /* ---------- کمک‌ها (ری‌اکشن‌ها حالا داخل chat.js هستند) ---------- */
   var IDRE = /^(?:[a-z_:-]*[-_:])?([0-9a-f]{32})$/i, SKIP = /^(src|href|srcset|style|poster|download|action|data-rx.*)$/i, SKIPTAG = /^(IMG|A|VIDEO|AUDIO|SOURCE|SVG|USE)$/i;
   function idOf(el) {
     if (SKIPTAG.test(el.tagName)) return null;
@@ -257,206 +234,15 @@
   function api(url, opt) {
     return fetch(url, Object.assign({ credentials: "same-origin" }, opt || {})).then(function (r) { return r.json().catch(function () { return {}; }); });
   }
-  function queue(id) { if (!(id in cache)) { pending[id] = 1; clearTimeout(timer); timer = setTimeout(flush, 150); } }
-  function flush() {
-    var ids = Object.keys(pending); pending = {};
-    for (var i = 0; i < ids.length; i += 100) (function (chunk) {
-      api("/api/reactions?ids=" + chunk.join(",")).then(function (d) {
-        var r = d.reactions || {}; Object.assign(texts, d.texts || {});
-        chunk.forEach(function (id) { cache[id] = r[id] || []; renderId(id); });
-      }).catch(function () {});
-    })(ids.slice(i, i + 100));
+  var feed = $("#messages");
+  /* آپدیت لحظه‌ای نظرسنجی از همان اتصال chat.js (اتصال دوم باز نمی‌شود) */
+  function hookPolls(C) {
+    var s = C && C.socket;
+    if (s && s.on) s.on("poll_update", function (d) { if (d && d.id && window.__ppSetVotes) window.__ppSetVotes(d.id, d.votes); });
   }
-  function react(id, emoji) {
-    api("/api/react", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: id, emoji: emoji }) })
-      .then(function (d) { if (d.ok) { cache[id] = d.reactions; renderId(id); } else toast(d.error || "خطا در ثبت واکنش"); })
-      .catch(function () { toast("اتصال برقرار نیست"); });
-  }
-  function renderId(id) {
-    (hosts[id] || []).slice().forEach(function (h) {
-      if (!h.isConnected) { hosts[id] = hosts[id].filter(function (x) { return x !== h; }); return; }
-      render(h, id);
-    });
-  }
-  function norm(s) { return String(s || "").replace(/\s+/g, ""); }
-  function plain(n) {
-    if (n.nodeType === 3) return n.nodeValue;
-    if (n.nodeType !== 1) return "";
-    if (n.tagName === "IMG") return n.alt || "";
-    var o = ""; for (var c = n.firstChild; c; c = c.nextSibling) o += plain(c); return o;
-  }
-  function findAnchor(h, id) {
-    var t = norm(texts[id]), c = [];
-    if (t) {
-      [].forEach.call(h.querySelectorAll("*"), function (e) {
-        if (e.closest(".rx-row,.pp-card") || /^(SCRIPT|STYLE|BUTTON)$/.test(e.tagName)) return;
-        if (norm(plain(e)) === t) c.push(e);
-      });
-      c = c.filter(function (e) { return !c.some(function (o) { return o !== e && e.contains(o); }); });
-      if (c.length) return c[c.length - 1];
-    }
-    var card = h.querySelector(".pp-card"); if (card) return card;
-    var ms = h.querySelectorAll("img:not(.ap-emoji),video,audio");
-    for (var i = 0; i < ms.length; i++) if (!ms[i].closest("[class*=avatar],.rx-row")) return ms[i].closest("a") || ms[i];
-    return null;
-  }
-  /* ---------- ظاهر چیپ: ایموجی + آواتار واکنش‌دهنده‌ها (تا ۳ نفر) یا تعداد ---------- */
-  function userInfo(name) {
-    var U = window.CHATROOM && window.CHATROOM.initialUsers, u = null;
-    try { if (Array.isArray(U)) { for (var i = 0; i < U.length; i++) if (U[i] && U[i].username === name) { u = U[i]; break; } } else if (U) u = U[name]; } catch (e) {}
-    return u || {};
-  }
-  function avatarEl(name) {
-    var u = userInfo(name), a = document.createElement("span"); a.className = "rx-av"; a.title = u.display_name || name;
-    if (u.avatar_url) { var im = document.createElement("img"); im.src = u.avatar_url; im.alt = ""; im.onerror = function () { im.remove(); a.textContent = (u.display_name || name || "?").charAt(0); }; a.appendChild(im); }
-    else a.textContent = (u.display_name || name || "?").charAt(0).toUpperCase();
-    return a;
-  }
-  function fillChip(c, r) {
-    var e = document.createElement("span"); e.className = "rx-e"; e.textContent = r.emoji; c.appendChild(e);
-    if (r.users.length <= 3) {
-      var w = document.createElement("span"); w.className = "rx-avs";
-      r.users.forEach(function (n) { w.appendChild(avatarEl(n)); }); c.appendChild(w);
-    } else { var n = document.createElement("b"); n.className = "rx-n"; n.textContent = r.users.length; c.appendChild(n); }
-  }
-  /* حباب واقعی پیام را از روی ساعت پیدا می‌کند و ردیفِ ساعت (فرزند مستقیم حباب) را هم برمی‌گرداند */
-  function bgAlpha(cs) {
-    if (cs.backgroundImage && cs.backgroundImage !== "none") return 1;
-    var m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor || ""); if (!m) return 0;
-    var p = m[1].split(","); return p.length > 3 ? parseFloat(p[3]) : 1;
-  }
-  function findBubble(h) {
-    if (h.__rxb && h.contains(h.__rxb) && h.__rxb !== h) return h.__rxb;
-    var tre = /[0-9\u06f0-\u06f9]{1,2}:[0-9\u06f0-\u06f9]{2}/, w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT, null), n, te, el;
-    while ((n = w.nextNode())) {
-      var v = n.nodeValue; if (!v || v.length > 14 || !tre.test(v)) continue;
-      te = n.parentElement; if (!te || te.closest(".rx-row")) continue;
-      for (el = te.parentElement; el && el !== h; el = el.parentElement) {
-        if (bgAlpha(getComputedStyle(el)) > 0.05) {
-          var t = te; while (t.parentElement && t.parentElement !== el) t = t.parentElement;
-          h.__rxt = t; return el;
-        }
-      }
-    }
-    return null;
-  }
-  function render(h, id) {
-    var list = cache[id] || [], row = h.__rxrow;
-    if (!list.length) { if (row) { row.remove(); h.__rxrow = null; } if (h.__rxb) h.__rxb.classList.remove("has-rx"); return; }
-    if (!row) { row = h.__rxrow = document.createElement("div"); row.className = "rx-row"; row.__anch = 0; row.__sig = ""; }
-    var sig = JSON.stringify(list);
-    if (row.__sig !== sig) {
-      row.__sig = sig; row.innerHTML = "";
-      list.forEach(function (r) {
-        var mine = r.users.indexOf(ME) > -1, c = document.createElement("button");
-        c.type = "button"; c.className = "rx-chip" + (mine ? " mine" : ""); c.title = r.users.join("، ");
-        fillChip(c, r);
-        c.onclick = function (e) { e.stopPropagation(); react(id, r.emoji); };
-        row.appendChild(c);
-      });
-    }
-    var b = findBubble(h);
-    if (b) {
-      var t = h.__rxt;
-      if (t && t.parentNode === b) { if (row.parentNode !== b || row.nextSibling !== t) b.insertBefore(row, t); }
-      else if (row.parentNode !== b) b.appendChild(row);
-      b.classList.add("rx-bubble", "has-rx"); h.__rxb = b; row.__anch = 1;
-    } else if (!row.isConnected || !h.contains(row) || !row.__anch) {
-      var a = findAnchor(h, id);
-      if (a && a.parentNode) { a.parentNode.insertBefore(row, a.nextSibling); row.__anch = 1; }
-      else if (!row.isConnected || !h.contains(row)) { h.appendChild(row); row.__anch = 0; }
-    }
-  }
-  function ensureHost(el, id) {
-    if (el.__rx === id) { render(el, id); return; }
-    el.__rx = id; el.classList.add("rx-host");
-    (hosts[id] = hosts[id] || []);
-    if (hosts[id].indexOf(el) < 0) hosts[id].push(el);
-    render(el, id); queue(id);
-  }
-  function quickBar(x, host, id) {
-    if (openPop && openPop._for === id) return closePop();
-    closePop();
-    var mine = ((cache[id] || []).filter(function (r) { return r.users.indexOf(ME) > -1; })[0] || {}).emoji;
-    var bar = document.createElement("div"); bar.className = "pp-pop rq"; bar._for = id; bar.dir = "ltr";
-    QUICK.forEach(function (em) {
-      var b = document.createElement("button"); b.type = "button"; b.textContent = em; if (em === mine) b.className = "mine";
-      b.onclick = function () { closePop(); react(id, em); }; bar.appendChild(b);
-    });
-    var more = document.createElement("button"); more.type = "button"; more.className = "rq-more"; more.setAttribute("data-no-emoji", "");
-    more.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
-    more.onclick = function () {
-      var r = bar.getBoundingClientRect();
-      closePop();
-      var p = emojiPicker(function (em) { closePop(); react(id, em); });
-      show(p, { getBoundingClientRect: function () { return r; } }, false);
-    };
-    bar.appendChild(more);
-    document.body.appendChild(bar); openPop = bar;
-    function pos() {
-      var r = host.getBoundingClientRect(), w = bar.offsetWidth, h = bar.offsetHeight;
-      var left = Math.min(Math.max(8, x - w / 2), innerWidth - w - 8), top = r.top - h - 8;
-      if (top < 64) top = Math.min(r.bottom + 8, innerHeight - h - 8);
-      bar.style.left = left + "px"; bar.style.top = top + "px";
-    }
-    pos(); setTimeout(pos, 80);
-  }
-  if ($("#messages")) {
-    $("#messages").addEventListener("click", function (e) {
-      var host = e.target.closest && e.target.closest(".rx-host");
-      if (!host || !host.__rx) return;
-      if (e.target.closest("a,button,input,textarea,select,video,audio,.pp-card,.rx-row,.avatar,[class*=reply],[class*=quote],img:not(.ap-emoji)")) return;
-      var sel = window.getSelection && String(window.getSelection()); if (sel && sel.length > 0) return;
-      quickBar(e.clientX, host, host.__rx);
-    }, true);
-    $("#messages").addEventListener("scroll", closePop, { passive: true });
-  }
-  function scan(root) {
-    if (!root || root.nodeType !== 1) return;
-    if (root.closest && root.closest(".rx-row")) return;
-    var list = [root].concat([].slice.call(root.querySelectorAll("*")));
-    list.forEach(function (el) {
-      if (el.classList.contains("rx-row") || el.closest(".rx-row")) return;
-      var id = idOf(el); if (!id) return;
-      var p = el.parentElement; if (p && p.closest(".rx-host") && p.closest(".rx-host") !== el) return;
-      ensureHost(el, id);
-    });
-  }
-  var feed = $("#messages"), raf = 0;
-  if (feed) {
-    new MutationObserver(function (muts) {
-      muts.forEach(function (m) {
-        if (m.target.closest && m.target.closest(".rx-row")) return;
-        [].forEach.call(m.addedNodes, function (n) {
-          if (n.nodeType === 1 && !n.classList.contains("rx-row")) scan(n);
-        });
-      });
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(function () {
-        [].forEach.call(feed.querySelectorAll(".rx-host"), function (h) { if (h.__rx) ensureHost(h, h.__rx); });
-      });
-    }).observe(feed, { childList: true, subtree: true });
-    scan(feed);
-  }
-  var ioTries = 0, sock = null;
-  (function waitIo() {
-    if (typeof io === "function") {
-      try {
-        sock = io();
-        sock.on("reaction_update", function (d) { if (d && d.id) { cache[d.id] = d.reactions || []; renderId(d.id); } });
-        sock.on("poll_update", function (d) { if (d && d.id && window.__ppSetVotes) window.__ppSetVotes(d.id, d.votes); });
-      } catch (e) {}
-    } else if (++ioTries < 60) setTimeout(waitIo, 500);
-  })();
-  setInterval(function () {
-    if (document.hidden) return;
-    var ids = Object.keys(hosts).filter(function (id) { return (hosts[id] || []).some(function (h) { return h.isConnected; }); }).slice(-100);
-    if (!ids.length) return;
-    api("/api/reactions?ids=" + ids.join(",")).then(function (d) {
-      var r = d.reactions || {}; Object.assign(texts, d.texts || {}); ids.forEach(function (id) { if (id in r) { cache[id] = r[id]; renderId(id); } });
-    }).catch(function () {});
-  }, 8000);
-
+  if (window.CRChat) hookPolls(window.CRChat); else addEventListener("cr:ready", function () { hookPolls(window.CRChat); }, { once: true });
+  /* پنل ایموجی و پاپ‌آپ‌ها برای منوی پیام (chat.js) */
+  window.CRPlus = { emojiPicker: emojiPicker, show: show, closePop: closePop };
 
   /* ---------- پیام‌های ویژه: موقعیت / مخاطب / نظرسنجی ---------- */
   var MARK = /^\u27e6(loc|contact|poll)\u27e7([\s\S]*)$/, pollCache = {}, pollCards = {}, pollPending = {}, pollTimer = null;
