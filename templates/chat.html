@@ -74,6 +74,7 @@ window.CHATROOM = {
   maxFileMb: {{ max_file_mb|default(15)|tojson }}
 };
 </script>
+<script src="{{ url_for('static', filename='chat-bg.js') }}?v={{ ASSET_V }}"></script>
 <script>
 /* socket.io client with CDN fallbacks (cdn.socket.io may be blocked); chat.js also works without it (HTTP fallback). */
 (function () {
