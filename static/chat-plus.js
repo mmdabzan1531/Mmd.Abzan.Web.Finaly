@@ -252,7 +252,7 @@
     (hosts[id] = hosts[id] || []);
     if (hosts[id].indexOf(el) < 0) hosts[id].push(el);
     if (!el.querySelector(":scope > .rx-add")) {
-      var b = document.createElement("button"); b.type = "button"; b.className = "rx-add"; b.setAttribute("data-pp-toggle", ""); b.title = "واکنش"; b.textContent = "☺";
+      var b = document.createElement("button"); b.type = "button"; b.className = "rx-add"; b.setAttribute("data-pp-toggle", ""); b.title = "واکنش"; b.setAttribute("data-no-emoji", ""); b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.25"/><circle cx="9" cy="10" r=".6" fill="currentColor"/><circle cx="15" cy="10" r=".6" fill="currentColor"/><path d="M8.3 14.4c.9 1.5 2.2 2.2 3.7 2.2s2.8-.7 3.7-2.2"/></svg>';
       b.onclick = function (e) { e.stopPropagation(); e.preventDefault(); quickBar(b, id); };
       el.appendChild(b);
     }
