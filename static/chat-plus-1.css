@@ -57,3 +57,34 @@ img.ap-emoji{display:inline-block;width:1.25em;height:1.25em;vertical-align:-.25
 .rq button img.ap-emoji{width:1.6rem;height:1.6rem}
 .rx-chip img.ap-emoji{width:1.1em;height:1.1em;vertical-align:middle}
 .ep-tabs button img.ap-emoji{width:1.2rem;height:1.2rem;vertical-align:middle}
+
+/* پنل ایموجی چسبیده بالای نوار پیام */
+.ep.dock{max-width:none;border-radius:16px}
+.ep.dock .ep-grid{height:min(300px,38vh);grid-template-columns:repeat(auto-fill,minmax(40px,1fr))}
+.am{max-height:72vh;overflow-y:auto}
+
+/* کارت‌های موقعیت / مخاطب / نظرسنجی */
+.pp-card{display:block;min-width:220px;max-width:100%;padding:8px;border-radius:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);text-align:start}
+.pp-card-top{display:flex;align-items:center;gap:10px}
+.pp-card-top b{display:block}.pp-card-top small{opacity:.75}
+.pp-ico{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:1.4rem;background:rgba(255,255,255,.12);flex:0 0 auto}
+.pp-card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pp-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:inherit;font:inherit;font-size:.88rem;cursor:pointer;text-decoration:none}
+.pp-btn:hover{background:rgba(255,255,255,.16)}
+.pp-btn.hot{background:#f5b82e;color:#111;border-color:#f5b82e;font-weight:600}
+.pp-poll-q{font-weight:700;margin-bottom:2px}
+.pp-poll-hint,.pp-poll-total{display:block;opacity:.65;font-size:.78rem;margin:2px 0 6px}
+.pp-opt{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:4px 0;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:inherit;font:inherit;text-align:start;cursor:pointer;overflow:hidden}
+.pp-opt.mine{border-color:#f5b82e}
+.pp-bar{position:absolute;inset-block:0;inset-inline-start:0;background:rgba(245,184,46,.28);transition:width .3s;z-index:0}
+.pp-opt-t,.pp-opt-n{position:relative;z-index:1}.pp-opt-n{font-size:.78rem;opacity:.85;white-space:nowrap}
+
+/* پنجره‌ی ورودی (نظرسنجی / مخاطب) */
+.pp-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:110;display:grid;place-items:center;padding:16px}
+.pp-modal{width:min(380px,100%);max-height:88vh;overflow:auto;background:var(--panel,var(--night,#14141c));color:inherit;border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:16px;box-shadow:0 14px 50px rgba(0,0,0,.6)}
+.pp-modal h3{margin:0 0 10px}
+.pp-field{display:block;margin:8px 0}
+.pp-field span{display:block;font-size:.82rem;opacity:.75;margin-bottom:4px}
+.pp-field input{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:inherit;font:inherit}
+.pp-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.pp-modal .pp-btn{margin-top:6px}.pp-actions .pp-btn{margin-top:0}
