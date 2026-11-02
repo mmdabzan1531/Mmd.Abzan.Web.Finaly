@@ -296,6 +296,9 @@ def init_data():
         g.setdefault("banned", [])
         g.setdefault("avatar_url", "")
         g.setdefault("background", "")
+        g.setdefault("pins", [])
+        g.setdefault("only_admins_post", False)
+        g.setdefault("members_can_invite", True)
         if g["type"] != "dm" and g["owner"] in ("", "system") and g["members"]:
             g["owner"] = g["members"][0]          # old groups without an owner: the first member becomes owner
     write_json(GROUPS_FILE, groups)
@@ -474,6 +477,7 @@ def shape(r, users):
         "reply_text": ("📎 پیوست" if rt == "" else (special_label(rt or "") or rt or ""))[:120],
         "reply_name": ru.get("display_name", r["reply_user"] or ""),
         "reply_gone": bool(r["reply_to"]) and rt is None,
+        "reactions": [],
     }
 
 
@@ -482,7 +486,9 @@ def fetch_page(gid, before=None, limit=PAGE):
     rows = q(sql, (gid, before, limit + 1) if before else (gid, limit + 1))
     more = len(rows) > limit
     users = read_json(USERS_FILE, {})
-    return [shape(r, users) for r in reversed(rows[:limit])], more
+    out = [shape(r, users) for r in reversed(rows[:limit])]
+    attach_reactions(out)
+    return out, more
 
 
 def fetch_one(mid):
@@ -596,7 +602,9 @@ def is_member(group, username):
 def public_group(g):
     return {"name": g.get("name", "گروه"), "description": g.get("description", ""), "members": g.get("members", []),
             "owner": g.get("owner", ""), "admins": g.get("admins", []), "type": g.get("type", "group"),
-            "avatar_url": g.get("avatar_url", ""), "background": g.get("background", "")}
+            "avatar_url": g.get("avatar_url", ""), "background": g.get("background", ""),
+            "pins": g.get("pins", []), "only_admins_post": bool(g.get("only_admins_post", False)),
+            "members_can_invite": bool(g.get("members_can_invite", True))}
 
 
 def last_msg(gid):
@@ -1555,7 +1563,8 @@ def create_group():
         gid = uuid.uuid4().hex[:12]
         groups[gid] = {"name": name, "description": desc, "members": [username], "owner": username,
                        "admins": [], "banned": [], "type": "group", "invite_code": secrets.token_urlsafe(12),
-                       "avatar_url": ""}
+                       "avatar_url": "", "background": "", "pins": [],
+                       "only_admins_post": False, "members_can_invite": True}
         write_json(GROUPS_FILE, groups)
     join_sids(username, gid)
     socketio.emit("groups_snapshot", {"groups": my_groups(username)}, to="user:" + username)
@@ -1596,6 +1605,8 @@ def invite_link(group_id):
             return jsonify(error="به این گروه دسترسی نداری."), 403
         if g.get("type") == "dm":
             return jsonify(error="برای گفتگوی خصوصی لینک دعوت وجود ندارد."), 400
+        if not g.get("members_can_invite", True) and not is_admin(g, session["username"]):
+            return jsonify(error="فقط مالک یا ادمین می‌تواند لینک دعوت بگیرد."), 403
         if not g.get("invite_code"):
             g["invite_code"] = secrets.token_urlsafe(12)
             write_json(GROUPS_FILE, groups)
@@ -2079,12 +2090,14 @@ def on_load_older(data):
 sent_cids = {}   # (username, client id) -> (message, time): makes retries idempotent (no duplicate messages)
 
 
-def deliver_message(username, gid, text, reply_to="", cid="", attach=None):
+def deliver_message(username, gid, text, reply_to="", cid="", attach=None, forwarded_from=""):
     """Single code path for sending (Socket.IO, HTTP fallback and file upload). Returns (message, error)."""
     text, cid = str(text or "").strip()[:1000], str(cid or "")[:40]
     g = valid_group(username, gid) if username else None
     if not g or (not text and not attach):
         return None, "ارسال پیام ممکن نیست."
+    if g.get("type") != "dm" and g.get("only_admins_post") and not is_admin(g, username) and username != BOT_USER:
+        return None, "در این گروه فقط مالک و ادمین‌ها می‌توانند پیام بفرستند."
     if text:
         text, serr = normalize_special(text)
         if serr:
@@ -2097,7 +2110,7 @@ def deliver_message(username, gid, text, reply_to="", cid="", attach=None):
     reply_to = str(reply_to or "")[:50]
     if reply_to and not q("SELECT 1 FROM messages WHERE id=? AND group_id=?", (reply_to, gid), one=True):
         reply_to = ""
-    m = insert_message(gid, username, text, reply_to=reply_to, attach=attach or "")
+    m = insert_message(gid, username, text, reply_to=reply_to, forwarded_from=forwarded_from, attach=attach or "")
     m["cid"] = cid
     if cid:
         now = time.time()
@@ -2142,6 +2155,7 @@ def api_messages():
         rows = q(SELECT_MSG + "WHERE m.group_id=? AND m.seq>? ORDER BY m.seq ASC LIMIT 200", (gid, after))
         users, more = read_json(USERS_FILE, {}), False
         msgs = [shape(r, users) for r in rows]
+        attach_reactions(msgs)
     return jsonify(ok=True, messages=msgs, has_more=more, group=public_group(g))
 
 
@@ -2191,6 +2205,17 @@ MSG_ID_RE = re.compile(r"[0-9a-f]{32}")
 
 def valid_emoji(e):
     return 0 < len(e) <= 16 and all(ord(ch) > 0x7f for ch in e)
+
+
+def attach_reactions(msgs):
+    """Fills m["reactions"] for a list of shaped messages with one query per 300 ids."""
+    ids = [m["id"] for m in msgs if m.get("id") and MSG_ID_RE.fullmatch(m["id"])]
+    for i in range(0, len(ids), 300):
+        part = reactions_for(ids[i:i + 300])
+        for m in msgs:
+            if m.get("id") in part:
+                m["reactions"] = part[m["id"]]
+    return msgs
 
 
 def reactions_for(ids):
@@ -2265,32 +2290,4 @@ def api_polls():
     ids = [i for i in request.args.get("ids", "").split(",") if MSG_ID_RE.fullmatch(i)][:200]
     if not ids:
         return jsonify(ok=True, polls={})
-    rows = q("SELECT id, group_id FROM messages WHERE id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids))
-    groups = read_json(GROUPS_FILE, {})
-    allowed = [r["id"] for r in rows if groups.get(r["group_id"]) and is_member(groups[r["group_id"]], username)]
-    return jsonify(ok=True, polls=poll_votes_for(allowed))
-
-
-@app.route("/api/poll/vote", methods=["POST"])
-@api_login
-def api_poll_vote():
-    """json: {id, option}. Voting for the same option again removes the vote."""
-    username = session["username"]
-    p = request.get_json(silent=True) or {}
-    mid = str(p.get("id", ""))
-    try:
-        opt = int(p.get("option"))
-    except (TypeError, ValueError):
-        return _err("گزینه نامعتبر است.")
-    row = q("SELECT group_id, text FROM messages WHERE id=?", (mid,), one=True) if MSG_ID_RE.fullmatch(mid) else None
-    g = valid_group(username, row["group_id"]) if row else None
-    sp = parse_special(row["text"]) if row else None
-    if not g or not sp or sp[0] != "poll":
-        return _err("نظرسنجی پیدا نشد.", 404)
-    if not 0 <= opt < len(sp[1]["o"]):
-        return _err("گزینه نامعتبر است.")
-    if not rate_ok("vote:" + username, 40, 10):
-        return _err("کمی آهسته‌تر.", 429)
-    cur = q("SELECT opt FROM poll_votes WHERE message_id=? AND username=?", (mid, username), one=True)
-    if cur and cur["opt"] == opt:
-        q(
+    rows = q("SELECT id,
