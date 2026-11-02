@@ -286,6 +286,7 @@ def init_data():
         g.setdefault("invite_code", secrets.token_urlsafe(12))
         g.setdefault("admins", [])
         g.setdefault("banned", [])
+        g.setdefault("avatar_url", "")
         if g["type"] != "dm" and g["owner"] in ("", "system") and g["members"]:
             g["owner"] = g["members"][0]          # old groups without an owner: the first member becomes owner
     write_json(GROUPS_FILE, groups)
@@ -372,6 +373,25 @@ def cleanup_media(stored_names):
                     os.remove(path)
         except Exception as e:
             print("[media] cleanup failed:", repr(e))
+
+
+def remove_media_url(url):
+    """Delete the stored file behind a '/media/<name>' URL (old profile / group photo). Other URLs are ignored."""
+    url = str(url or "")
+    if not url.startswith("/media/"):
+        return
+    nm = url.rsplit("/", 1)[-1].split("?")[0]
+    if not nm:
+        return
+    try:
+        if USE_PG:
+            q("DELETE FROM media WHERE name=?", (nm,), commit=True)
+        else:
+            path = os.path.join(UPLOAD_DIR, os.path.basename(nm))
+            if os.path.exists(path):
+                os.remove(path)
+    except Exception as e:
+        print("[media] remove failed:", repr(e))
 
 
 def shape(r, users):
@@ -509,7 +529,8 @@ def is_member(group, username):
 
 def public_group(g):
     return {"name": g.get("name", "گروه"), "description": g.get("description", ""), "members": g.get("members", []),
-            "owner": g.get("owner", ""), "admins": g.get("admins", []), "type": g.get("type", "group")}
+            "owner": g.get("owner", ""), "admins": g.get("admins", []), "type": g.get("type", "group"),
+            "avatar_url": g.get("avatar_url", "")}
 
 
 def last_msg(gid):
@@ -913,7 +934,7 @@ def startup_report():
 # ---------- ChatRoom assistant bot (a private chat every account gets) ----------
 BOT_USER = "chatroom_bot"
 BOT_PROFILE = {"display_name": "ChatRoom | محمد مهدی آبزن", "bio": "دستیار رسمی ChatRoom؛ آموزش، راهنما و پاسخ به پرسش‌های شما",
-               "avatar": "🤖", "avatar_url": "/static/bot.jpg"}
+               "avatar": "🤖", "avatar_url": "/static/bot.png"}
 
 BOT_WELCOME = (
     "سلام به ChatRoom | محمد مهدی آبزن خوش آمدید! 👋\n"
@@ -945,9 +966,9 @@ BOT_ANSWERS = {
           "۵. تنظیمات، پشتیبانی و خروج از حساب در پایین ستون کناری قرار دارند."),
     "2": ("👥 ساخت گروه و دعوت دوستان\n"
           "۱. دکمه‌ی «+» را بزنید، نام و توضیحات گروه را بنویسید و «ساخت گروه» را انتخاب کنید؛ سازنده‌ی گروه، مالک آن می‌شود.\n"
-          "۲. داخل گروه روی «لینک دعوت» بزنید و لینک را برای دوستانتان بفرستید؛ هر کس با آن وارد شود، عضو گروه می‌شود.\n"
+          "۲. داخل گروه روی «لینک دعوت» بزنید تا لینک کپی شود و آن را برای دوستانتان بفرستید؛ هر کس با آن وارد شود، عضو گروه می‌شود.\n"
           "۳. فهرست اعضا از دکمه‌ی «اعضا» در بالای صفحه نمایش داده می‌شود.\n"
-          "۴. مالک می‌تواند ادمین تعیین کند، مالکیت را منتقل کند یا گروه را حذف کند؛ مالک و ادمین‌ها می‌توانند اعضا را حذف و نام و توضیحات گروه را تغییر دهند."),
+          "۴. مالک و ادمین‌ها می‌توانند از «تنظیمات» عکس، نام و توضیحات گروه را تغییر دهند؛ مالک می‌تواند ادمین تعیین کند، مالکیت را منتقل کند یا گروه را حذف کند؛ مالک و ادمین‌ها می‌توانند اعضا را حذف کنند."),
     "3": ("💬 پیام خصوصی و جستجوی کاربران\n"
           "۱. نام کاربری یا نام نمایشی فرد را در کادر جستجو بنویسید (حداقل دو حرف).\n"
           "۲. روی نام او بزنید و گزینه‌ی «ارسال پیام» را انتخاب کنید.\n"
@@ -965,7 +986,7 @@ BOT_ANSWERS = {
     "6": ("✨ ویژگی‌های ChatRoom\n"
           "• ارسال و دریافت لحظه‌ای پیام‌ها\n"
           "• ارسال عکس، ویدیو، صوت و فایل\n"
-          "• پیام خصوصی و گروه‌های دعوت‌محور\n"
+          "• پیام خصوصی و گروه‌های دعوت‌محور با عکس پروفایل گروه\n"
           "• مدیریت گروه: مالک، ادمین، حذف عضو و انتقال مالکیت\n"
           "• پاسخ، ویرایش، حذف و فوروارد پیام\n"
           "• نمایش وضعیت آنلاین بودن و در حال نوشتن\n"
@@ -1370,7 +1391,8 @@ def chat():
         return redirect(url_for("index"))
     session.permanent = True
     resp = make_response(render_template("chat.html", current_user=safe_user_public(users[username], True),
-                                         groups=my_groups(username), users=visible_users(username)))
+                                         groups=my_groups(username), users=visible_users(username),
+                                         max_file_mb=MAX_FILE_MB))
     return sync_user_lang(resp, username)
 
 
@@ -1419,6 +1441,7 @@ def update_profile():
     if not display_name:
         return jsonify(error="نام نمایشی نمی‌تواند خالی باشد."), 400
     username = session["username"]
+    old_photo = ""
     with data_lock:
         users = read_json(USERS_FILE, {})
         if username not in users:
@@ -1433,8 +1456,12 @@ def update_profile():
             photo.stream.seek(0)
             if size > MAX_IMAGE_SIZE:
                 return jsonify(error="حجم عکس باید کمتر از ۴ مگابایت باشد."), 400
+            data = photo.read()
+            if not looks_like_image(data[:16]):
+                return jsonify(error="فایل تصویر معتبر نیست."), 400
             filename = f"{uuid.uuid4().hex}{ext}"
-            store_media(filename, IMAGE_MIME[ext], photo.read())
+            store_media(filename, IMAGE_MIME[ext], data)
+            old_photo = users[username].get("avatar_url", "")
             users[username]["avatar_url"] = "/media/" + filename
         users[username].update(display_name=display_name, bio=bio, avatar=avatar,
                                show_phone=request.form.get("show_phone") == "1", show_email=request.form.get("show_email") == "1")
@@ -1442,6 +1469,8 @@ def update_profile():
         write_json(USERS_FILE, users)
         pub = safe_user_public(users[username])
         full = safe_user_public(users[username], True)
+    if old_photo and old_photo != pub["avatar_url"]:
+        remove_media_url(old_photo)
     socketio.emit("profile_updated", pub)
     return jsonify(ok=True, user=full)
 
@@ -1459,7 +1488,8 @@ def create_group():
         groups = read_json(GROUPS_FILE, {})
         gid = uuid.uuid4().hex[:12]
         groups[gid] = {"name": name, "description": desc, "members": [username], "owner": username,
-                       "admins": [], "banned": [], "type": "group", "invite_code": secrets.token_urlsafe(12)}
+                       "admins": [], "banned": [], "type": "group", "invite_code": secrets.token_urlsafe(12),
+                       "avatar_url": ""}
         write_json(GROUPS_FILE, groups)
     join_sids(username, gid)
     socketio.emit("groups_snapshot", {"groups": my_groups(username)}, to="user:" + username)
@@ -1750,11 +1780,51 @@ def group_transfer(group_id):
     return jsonify(ok=True, group=public_group(g))
 
 
-def _delete_group_data(group_id):
+@app.route("/api/group/<group_id>/photo", methods=["POST"])
+@api_login
+def group_photo(group_id):
+    """مالک/ادمین: تغییر یا حذف عکس گروه. multipart form: photo (فایل) یا remove=1"""
+    me = session["username"]
+    photo = request.files.get("photo")
+    remove = request.form.get("remove") == "1"
+    old = ""
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or g.get("type") == "dm" or not is_admin(g, me):
+            return _err("فقط مالک یا ادمین می‌تواند عکس گروه را تغییر دهد.", 403)
+        old = g.get("avatar_url", "")
+        if remove:
+            g["avatar_url"] = ""
+        elif photo and photo.filename:
+            ext = os.path.splitext(secure_filename(photo.filename))[1].lower()
+            if ext not in ALLOWED_IMAGE_EXTENSIONS:
+                return _err("فرمت عکس پشتیبانی نمی‌شود.")
+            data = photo.read(MAX_IMAGE_SIZE + 1)
+            if len(data) > MAX_IMAGE_SIZE:
+                return _err("حجم عکس باید کمتر از ۴ مگابایت باشد.")
+            if not data or not looks_like_image(data[:16]):
+                return _err("فایل تصویر معتبر نیست.")
+            name = uuid.uuid4().hex + ext
+            store_media(name, IMAGE_MIME[ext], data)
+            g["avatar_url"] = "/media/" + name
+        else:
+            return _err("عکسی انتخاب نشده است.")
+        write_json(GROUPS_FILE, groups)
+    if old and old != g.get("avatar_url", ""):
+        remove_media_url(old)
+    _group_updated(group_id, g)
+    for n in list(g.get("members", [])):
+        _refresh_user(n)
+    return jsonify(ok=True, group=public_group(g))
+
+
+def _delete_group_data(group_id, avatar_url=""):
     names = [a.get("file") for a in (_parse_attach(r["attach"]) for r in
              q("SELECT attach FROM messages WHERE group_id=? AND attach<>''", (group_id,))) if a]
     q("DELETE FROM messages WHERE group_id=?", (group_id,), commit=True)
     cleanup_media(names)
+    remove_media_url(avatar_url)
 
 
 @app.route("/api/group/<group_id>/leave", methods=["POST"])
@@ -1771,7 +1841,7 @@ def group_leave(group_id):
         if len(g["members"]) <= 1:               # آخرین نفر: گروه پاک می‌شود
             groups.pop(group_id, None)
             write_json(GROUPS_FILE, groups)
-            _delete_group_data(group_id)
+            _delete_group_data(group_id, g.get("avatar_url", ""))
             _kick_sids(me, group_id)
             _refresh_user(me)
             return jsonify(ok=True, deleted=True)
@@ -1798,7 +1868,7 @@ def group_delete(group_id):
         members = list(g["members"])
         groups.pop(group_id)
         write_json(GROUPS_FILE, groups)
-        _delete_group_data(group_id)
+        _delete_group_data(group_id, g.get("avatar_url", ""))
     socketio.emit("group_deleted", {"id": group_id}, to=group_id)
     for n in members:
         _kick_sids(n, group_id)
