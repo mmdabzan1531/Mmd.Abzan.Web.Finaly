@@ -1,5 +1,5 @@
 const CACHE = "chatroom-{{ ASSET_V }}";
-const SHELL = ["/static/style.css", "/static/extra.css", "/static/themes.css", "/static/auth.css", "/static/theme.js", "/static/pwa.js", "/static/chat.js", "/static/auth.js", "/static/i18n.js", "/static/i18n-data.js", "/offline"];
+const SHELL = ["/static/style.css", "/static/extra.css", "/static/themes.css", "/static/auth.css", "/static/theme.js", "/static/i18n-data.js", "/static/i18n.js", "/static/pwa.js", "/static/chat.js", "/static/auth.js", "/offline"];
 const CDN = ["fonts.googleapis.com", "fonts.gstatic.com", "cdn.socket.io", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
