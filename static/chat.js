@@ -154,7 +154,7 @@
     const av = {avatar: m.avatar || u.avatar, avatar_url: m.avatar_url || u.avatar_url};
     const quote = m.reply_to ? `<button type="button" class="quote" data-no-i18n data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${m.reply_gone ? esc(t("پیام حذف شده")) : esc(m.reply_text === "📎 پیوست" ? t("📎 پیوست") : m.reply_text)}</span></button>` : "";
     const fwd = m.forwarded_from ? `<div class="fwd" data-no-i18n>${esc(tf("فوروارد از {name}", {name: m.forwarded_from}))}</div>` : "";
-    row.innerHTML = `<button type="button" class="avatar" data-profile="${esc(m.username)}" aria-label="${esc(t("پروفایل"))}">${avatarHtml(av)}</button><div class="bubble" tabindex="0"><div class="who" data-no-i18n>${esc(m.display_name || u.display_name || m.username)}</div>${fwd}${quote}${m.up ? upHtml(m) : attachHtml(m.attach)}<div class="txt" dir="auto" data-no-i18n></div><div class="foot"><span>${esc(t(m.pending ? "در حال ارسال…" : m.failed ? "ارسال نشد · برای تلاش دوباره بزن ↻" : (m.edited ? "ویرایش‌شده" : "")))}</span><time>${fmtTime(m.created_at)}</time></div></div>`;
+    row.innerHTML = `<button type="button" class="avatar" data-profile="${esc(m.username)}" aria-label="${esc(t("پروفایل"))}">${avatarHtml(av)}</button><div class="bubble" tabindex="0"><div class="who" data-no-i18n>${esc(m.display_name || u.display_name || m.username)}</div>${fwd}${quote}${m.up ? upHtml(m) : attachHtml(m.attach)}<div class="txt" dir="auto" data-no-i18n></div><div class="foot"><div class="rx-row" data-no-i18n>${chipsHtml(m)}</div><span class="meta"><span>${esc(t(m.pending ? "در حال ارسال…" : m.failed ? "ارسال نشد · برای تلاش دوباره بزن ↻" : (m.edited ? "ویرایش‌شده" : "")))}</span><time>${fmtTime(m.created_at)}</time></span></div></div>`;
     const txt = row.querySelector(".txt");
     if (m.username === BOT_USER) txt.removeAttribute("data-no-i18n");     // bot messages are translated, people's messages never
     txt.textContent = m.text || ""; if (!m.text) txt.hidden = true;
@@ -236,8 +236,9 @@
     });
     $("member-count").textContent = names.length.toLocaleString(LOC);
     $("online-count").textContent = names.filter(n => online.has(n)).length.toLocaleString(LOC);
+    document.dispatchEvent(new CustomEvent("cr:members"));
   }
-  function updateHeader() {
+  function updateHeaderCore() {
     const g = groups[activeGroup], peer = dmPeer(g);
     document.body.dataset.kind = !g ? "none" : (peer ? "dm" : "group");
     if (!g) { $("group-name-head").textContent = "Chatroom"; $("group-description").textContent = ""; $("head-avatar").innerHTML = ""; return; }
@@ -351,7 +352,7 @@
     const b = $("jump-n"); b.hidden = !awayCount; b.textContent = awayCount.toLocaleString(LOC);
   }
   feed.addEventListener("scroll", () => {
-    syncJump(); closeMenu();
+    syncJump(); if (Date.now() > popLock) closeMenu();
     if (feed.scrollTop < 80 && hasMore && !loadingOlder && msgs.length) {
       const first = msgs.find(m => m.seq); if (!first) return;
       loadingOlder = true; setTimeout(() => { loadingOlder = false; }, 6000);
@@ -483,27 +484,118 @@
     burst(); ctx = null; $("ctx-bar").hidden = true; input.value = ""; autosize(); input.focus();
   });
 
-  /* ---------- tap menu: tap = actions, double-tap = reply ---------- */
-  const menu = $("msg-menu");
-  function closeMenu() { menu.classList.remove("open"); document.querySelectorAll(".msg.picked").forEach(r => r.classList.remove("picked")); menuFor = null; }
+  /* =====================================================================
+   *  منوی پیام به سبک تلگرام:  نوار ری‌اکشن بالا + منوی عملیات پایین
+   *  ری‌اکشن‌ها داخل خود حباب، زیر متن و کنار ساعت نشان داده می‌شوند.
+   * ===================================================================== */
+  const QUICK = ["🤣", "😄", "🤪", "❤️", "👍", "👎", "🔥"];
+  const ICO = {
+    reply: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v3"/>',
+    copy: '<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/>',
+    forward: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0-6 6v3"/>',
+    pin: '<path d="M12 17v5"/><path d="M8.5 3h7l-1 6.2 2.5 2.8v2H7v-2l2.5-2.8z"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    delete: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
+    chev: '<path d="M6 9l6 6 6-6"/>'
+  };
+  const svg = k => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
+  const myReaction = m => ((m.reactions || []).find(r => r.users.includes(cfg.username)) || {}).emoji;
+  const miniAv = n => { const u = profileOf(n); return u.avatar_url ? `<img src="${esc(u.avatar_url)}" alt="">` : esc([...(u.display_name || n || "?")][0] || "?"); };
+  function chipsHtml(m) {
+    return (m.reactions || []).map(r => {
+      const mine = r.users.includes(cfg.username);
+      const who = r.users.length <= 3 ? `<span class="rx-avs">${r.users.map(n => `<span class="rx-av">${miniAv(n)}</span>`).join("")}</span>` : `<b class="rx-n">${nf(r.users.length)}</b>`;
+      return `<button type="button" class="rx-chip${mine ? " mine" : ""}" data-rx="${esc(r.emoji)}"><span class="rx-e">${esc(r.emoji)}</span>${who}</button>`;
+    }).join("");
+  }
+  function setReactions(id, list) {
+    const m = msgs.find(x => x.id === id); if (!m) return;
+    m.reactions = list || [];
+    const row = feed.querySelector(`[data-id="${CSS.escape(id)}"] .rx-row`); if (row) row.innerHTML = chipsHtml(m);
+  }
+  async function react(id, emoji) {
+    const d = await apiPost("/api/react", {id, emoji});
+    if (d && d.ok) setReactions(id, d.reactions);
+  }
+  socket.on("reaction_update", d => { if (d && d.id) setReactions(d.id, d.reactions); });
+
+  const css = document.createElement("style"); css.id = "cr-msg-style";
+  css.textContent = `
+.msg .bubble .foot{display:flex!important;flex-wrap:wrap;align-items:center;gap:2px 10px}
+.msg .bubble .foot .meta{display:inline-flex;align-items:center;gap:6px;margin-inline-start:auto;white-space:nowrap}
+.rx-row{display:flex;flex-wrap:wrap;gap:5px;direction:ltr;margin:5px 0 2px;max-width:100%}
+.rx-row:empty{display:none}
+.rx-chip{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px 0 7px;border:0;border-radius:999px;color:inherit;background:rgba(255,255,255,.17);font:inherit;cursor:pointer;animation:rxIn .28s cubic-bezier(.2,1.5,.4,1);transition:transform .15s}
+.rx-chip:active{transform:scale(.92)}
+.rx-chip.mine{background:linear-gradient(135deg,#8f80ff,#5a44e8);color:#fff;box-shadow:0 3px 12px rgba(110,90,250,.4)}
+.rx-chip .rx-e{font-size:1.1rem!important;line-height:1;opacity:1!important}
+.rx-chip .rx-n{font-size:.8rem!important;font-weight:700;opacity:1!important}
+.rx-chip img.ap-emoji{width:1.2rem!important;height:1.2rem!important;vertical-align:middle!important;margin:0!important}
+.rx-avs{display:inline-flex;direction:ltr;align-items:center}
+.rx-av{width:20px;height:20px;border-radius:50%;margin-left:-6px;display:grid;place-items:center;overflow:hidden;font-size:.62rem!important;font-weight:700;line-height:1;color:#fff!important;opacity:1!important;background:linear-gradient(135deg,#6b5bd6,#3b2f8f);border:1.5px solid rgba(20,18,38,.75)}
+.rx-av:first-child{margin-left:0}.rx-av img{width:100%;height:100%;object-fit:cover;display:block}
+@keyframes rxIn{from{transform:scale(.55);opacity:0}to{transform:none;opacity:1}}
+.msg.picked .bubble{outline:2px solid rgba(155,140,255,.75);outline-offset:2px}
+#mp-bar,#mp-menu{position:fixed;z-index:2147482000;opacity:0;pointer-events:none;transform:scale(.92);transform-origin:center top;transition:opacity .14s,transform .16s cubic-bezier(.2,.9,.3,1.1);
+  background:var(--panel,var(--night,#1c1b2b));color:inherit;border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 34px rgba(0,0,0,.5)}
+#mp-bar.open,#mp-menu.open{opacity:1;pointer-events:auto;transform:none}
+#mp-bar{display:flex;align-items:center;gap:1px;padding:6px 8px;border-radius:999px;direction:ltr}
+#mp-bar button{background:none;border:0;font-size:1.7rem;line-height:1;padding:3px 4px;border-radius:50%;cursor:pointer;color:inherit;transition:transform .12s}
+#mp-bar button:active{transform:scale(1.25)}
+#mp-bar button.mine{background:rgba(155,140,255,.32)}
+#mp-bar img.ap-emoji{width:1.8rem!important;height:1.8rem!important;vertical-align:middle!important;margin:0!important}
+#mp-bar .mp-more{width:34px;height:34px;display:grid;place-items:center;padding:0;margin-inline-start:3px;font-size:1rem;background:rgba(255,255,255,.16);border-radius:50%}
+#mp-menu{min-width:214px;padding:6px;border-radius:18px;direction:rtl}
+#mp-menu button{display:flex;align-items:center;gap:16px;width:100%;padding:12px 14px;border:0;background:none;color:inherit;font:inherit;font-size:1.02rem;border-radius:12px;text-align:start;cursor:pointer}
+#mp-menu button:hover,#mp-menu button:active{background:rgba(255,255,255,.1)}
+#mp-menu button.del{color:#ff6b6b}
+.pinbar{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--panel,rgba(30,28,48,.92));border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer}
+.pinbar[hidden]{display:none}
+.pinbar .pb-line{display:flex;flex-direction:column;gap:2px;height:30px;width:3px;flex:none}
+.pinbar .pb-line i{flex:1;border-radius:2px;background:rgba(155,140,255,.35)}.pinbar .pb-line i.on{background:#9b8cff}
+.pinbar .pb-txt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.pinbar .pb-txt b{font-size:.78rem;color:#b9a9ff}.pinbar .pb-txt span{font-size:.88rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pinbar .pb-x{border:0;background:none;color:inherit;opacity:.65;font-size:1rem;padding:6px;cursor:pointer}
+.composer.locked{opacity:.55;pointer-events:none}`;
+  document.head.appendChild(css);
+
+  let popLock = 0;
+  const popBar = document.createElement("div"), popMenu = document.createElement("div");
+  popBar.id = "mp-bar"; popMenu.id = "mp-menu"; popBar.setAttribute("role", "toolbar"); popMenu.setAttribute("role", "menu");
+  document.body.append(popBar, popMenu);
+  function closeMenu() {
+    popBar.classList.remove("open"); popMenu.classList.remove("open");
+    document.querySelectorAll(".msg.picked").forEach(r => r.classList.remove("picked")); menuFor = null;
+    if (window.CRPlus) window.CRPlus.closePop();
+  }
   function openMenu(row, m) {
     closeMenu(); menuFor = m.id; row.classList.add("picked");
-    const mine = m.username === cfg.username, canDel = mine || iAmAdmin(groups[m.group_id]);   // group owner / admins may delete anyone's message
-    menu.innerHTML = [["reply", "↩", "پاسخ"]].concat(m.text ? [["copy", "⧉", "کپی"]] : [], [["forward", "➦", "فوروارد"]], mine && m.text ? [["edit", "✎", "ویرایش"]] : [], canDel ? [["delete", "✕", "حذف"]] : [])
-      .map(([a, i, l]) => `<button type="button" role="menuitem" data-act="${a}" class="${a === "delete" ? "del" : ""}"><i>${i}</i>${esc(t(l))}</button>`).join("");
-    menu.classList.add("open");
-    const r = row.querySelector(".bubble").getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
-    let top = r.bottom + 6; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 6);
-    const left = Math.min(Math.max(8, mine ? r.left : r.right - w), innerWidth - w - 8);
-    menu.style.top = top + "px"; menu.style.left = left + "px";
-    menu.querySelector("button").focus({preventScroll: true});
+    const g = groups[m.group_id], mine = m.username === cfg.username, special = /^\u27e6/.test(m.text || "");
+    const canDel = mine || iAmAdmin(g), canPin = !!g && (g.type === "dm" || iAmAdmin(g)), pinned = !!g && (g.pins || []).some(p => p.id === m.id), cur = myReaction(m);
+    popBar.innerHTML = QUICK.map(e => `<button type="button" data-rx="${esc(e)}" class="${e === cur ? "mine" : ""}">${e}</button>`).join("")
+      + `<button type="button" class="mp-more" data-more aria-label="${esc(t("ایموجی بیشتر"))}">${svg("chev")}</button>`;
+    const items = [["reply", "پاسخ"]];
+    if (m.text && !special) items.push(["copy", "کپی"]);
+    items.push(["forward", "فوروارد"]);
+    if (canPin) items.push([pinned ? "unpin" : "pin", pinned ? "برداشتن سنجاق" : "سنجاق"]);
+    if (mine && m.text && !special) items.push(["edit", "ویرایش"]);
+    if (canDel) items.push(["delete", "حذف"]);
+    popMenu.innerHTML = items.map(([a, l]) => `<button type="button" role="menuitem" data-act="${a}" class="${a === "delete" ? "del" : ""}">${svg(a === "unpin" ? "pin" : a)}<span>${esc(t(l))}</span></button>`).join("");
+    popBar.classList.add("open"); popMenu.classList.add("open"); popLock = Date.now() + 350;
+    const r = row.querySelector(".bubble").getBoundingClientRect(), bw = popBar.offsetWidth, bh = popBar.offsetHeight, mw = popMenu.offsetWidth, mh = popMenu.offsetHeight;
+    const head = document.querySelector(".room-head"), topLimit = Math.max(8, (head ? head.getBoundingClientRect().bottom : 0) + 6);
+    const bt = Math.max(topLimit, r.top - bh - 8);
+    let mt = r.bottom + 8; if (mt + mh > innerHeight - 8) mt = Math.max(bt + bh + 8, innerHeight - mh - 8);
+    popBar.style.top = bt + "px"; popBar.style.left = Math.min(Math.max(8, r.left + r.width / 2 - bw / 2), innerWidth - bw - 8) + "px";
+    popMenu.style.top = mt + "px"; popMenu.style.left = Math.min(Math.max(8, mine ? r.left : r.right - mw), innerWidth - mw - 8) + "px";
   }
   const msgOf = el => { const row = el.closest(".msg"); return row ? msgs.find(x => x.id === row.dataset.id) : null; };
   feed.addEventListener("click", e => {
     const prof = e.target.closest("[data-profile]"); if (prof) return openUserProfile(prof.dataset.profile);
     const go = e.target.closest("[data-goto]"); if (go) return gotoMsg(go.dataset.goto);
     const lb = e.target.closest("[data-lightbox]"); if (lb) { e.preventDefault(); return openLightbox(lb.dataset.lightbox); }
-    if (e.target.closest("video, audio, a.att-file")) return;      // let media controls / downloads work; a failed upload (div) still retries
+    const chip = e.target.closest(".rx-chip"); if (chip) { const cm = msgOf(chip); if (cm && !cm.pending) react(cm.id, chip.dataset.rx); return; }
+    if (e.target.closest("video, audio, a.att-file, .pp-card, a[href]")) return;      // media controls, downloads, location / poll cards
     const bubble = e.target.closest(".bubble"); if (!bubble || String(getSelection())) return;
     const m = msgOf(bubble); if (!m) return;
     if (m.failed) return retry(m);
@@ -517,17 +609,62 @@
     const b = e.target.closest(".bubble"), m = b && msgOf(b);
     if (m && !m.pending) { e.preventDefault(); openMenu(b.closest(".msg"), m); }
   });
-  document.addEventListener("click", e => { if (menuFor && !e.target.closest(".bubble") && !e.target.closest("#msg-menu")) closeMenu(); });
+  document.addEventListener("click", e => { if (menuFor && !e.target.closest(".bubble") && !e.target.closest("#mp-bar,#mp-menu,.pp-pop")) closeMenu(); });
   /* tapping anywhere outside the members drawer closes it (mobile) */
   document.addEventListener("click", e => {
-    if (peopleEl.classList.contains("open") && drawerMode() && !e.target.closest("#people") && !e.target.closest("#open-members") && !e.target.closest(".modal") && !e.target.closest("#msg-menu")) setPeople(false);
+    if (peopleEl.classList.contains("open") && drawerMode() && !e.target.closest("#people") && !e.target.closest("#open-members") && !e.target.closest(".modal") && !e.target.closest("#mp-bar,#mp-menu")) setPeople(false);
   });
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeMenu(); setPeople(false); document.querySelectorAll(".modal.show").forEach(m => m.classList.remove("show")); $("lightbox").hidden = true; } });
-  menu.addEventListener("click", e => {
-    const btn = e.target.closest("[data-act]"), m = msgs.find(x => x.id === menuFor); if (!btn || !m) return;
-    closeMenu();
-    ({reply: startReply, copy: copyMsg, forward: askForward, edit: startEdit, delete: askDelete})[btn.dataset.act](m);
+  popBar.addEventListener("click", e => {
+    const b = e.target.closest("button"), m = msgs.find(x => x.id === menuFor); if (!b || !m) return;
+    if (b.hasAttribute("data-more")) {
+      const P = window.CRPlus; if (!P) return toast("پنل ایموجی هنوز آماده نیست.");
+      const id = m.id, r = popBar.getBoundingClientRect();
+      P.show(P.emojiPicker(em => { closeMenu(); react(id, em); }), {getBoundingClientRect: () => r}, false);
+      return;
+    }
+    if (b.dataset.rx) { const id = m.id; closeMenu(); react(id, b.dataset.rx); }
   });
+  const pinMsg = (m, pin) => live() ? (socket.emit("pin_message", {id: m.id, pin}), toast(pin ? "پیام سنجاق شد." : "سنجاق برداشته شد.")) : toast(LIVE_MSG);
+  const ACT = {reply: m => startReply(m), copy: m => copyMsg(m), forward: m => askForward(m), edit: m => startEdit(m), delete: m => askDelete(m), pin: m => pinMsg(m, true), unpin: m => pinMsg(m, false)};
+  popMenu.addEventListener("click", e => {
+    const b = e.target.closest("[data-act]"), m = msgs.find(x => x.id === menuFor); if (!b || !m) return;
+    closeMenu(); ACT[b.dataset.act](m);
+  });
+
+  /* ---------- پیام سنجاق‌شده (نوار زیر هدر) ---------- */
+  const pinBar = $("pin-bar"); let pinIdx = 0, pinSig = "";
+  function renderPin() {
+    if (!pinBar) return;
+    const g = groups[activeGroup], pins = (g && g.pins) || [];
+    if (!pins.length) { pinBar.hidden = true; pinSig = ""; return; }
+    const sig = pins.map(p => p.id).join(",");
+    if (sig !== pinSig) { pinSig = sig; pinIdx = pins.length - 1; }
+    pinIdx = Math.min(Math.max(pinIdx, 0), pins.length - 1);
+    const p = pins[pinIdx], canUnpin = g.type === "dm" || iAmAdmin(g);
+    pinBar.hidden = false;
+    pinBar.innerHTML = `<span class="pb-line">${pins.map((_, i) => `<i class="${i === pinIdx ? "on" : ""}"></i>`).join("")}</span>`
+      + `<span class="pb-txt" data-no-i18n><b>${esc(pins.length > 1 ? tf("پیام سنجاق‌شده #{n}", {n: nf(pinIdx + 1)}) : t("پیام سنجاق‌شده"))}</b><span>${esc(pv(p.text) || "…")}</span></span>`
+      + (canUnpin ? `<button type="button" class="pb-x" data-unpin="${esc(p.id)}" aria-label="${esc(t("برداشتن سنجاق"))}">✕</button>` : "");
+  }
+  if (pinBar) pinBar.addEventListener("click", e => {
+    const x = e.target.closest("[data-unpin]");
+    if (x) return void (live() ? socket.emit("pin_message", {id: x.dataset.unpin, pin: false}) : toast(LIVE_MSG));
+    const g = groups[activeGroup], pins = (g && g.pins) || []; if (!pins.length) return;
+    gotoMsg(pins[pinIdx].id); pinIdx = (pinIdx - 1 + pins.length) % pins.length; renderPin();
+  });
+  /* گروه «فقط ادمین‌ها پیام بدهند»: نوار پیام برای اعضای عادی قفل می‌شود */
+  function updateComposer() {
+    const g = groups[activeGroup], locked = !!g && g.type !== "dm" && !!g.only_admins_post && !iAmAdmin(g);
+    form.classList.toggle("locked", locked); input.disabled = locked;
+    input.placeholder = t(locked ? "فقط ادمین‌ها می‌توانند پیام بفرستند" : "پیامت را بنویس…");
+  }
+  function updateHeader() {
+    updateHeaderCore(); renderPin(); updateComposer();
+    document.dispatchEvent(new CustomEvent("cr:group", {detail: {id: activeGroup}}));
+  }
+  function openGroupInfo() { if (!(window.CRGroupInfo && window.CRGroupInfo.open())) openGroupSettings(); }
+
   function openLightbox(url) { $("lightbox-img").src = url; $("lightbox").hidden = false; }
   $("lightbox").addEventListener("click", () => { $("lightbox").hidden = true; $("lightbox-img").removeAttribute("src"); });
   function gotoMsg(id) {
@@ -559,7 +696,7 @@
   document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => hideModal(b.dataset.close)));
   document.querySelectorAll(".modal").forEach(m => m.addEventListener("click", e => { if (e.target === m) m.classList.remove("show"); }));
   $("open-profile").addEventListener("click", () => showModal("profile-modal"));
-  $("open-group").addEventListener("click", () => openGroupSettings());
+  $("open-group").addEventListener("click", () => openGroupInfo());
   $("open-create-group").addEventListener("click", () => showModal("create-group-modal"));
   $("open-sidebar").addEventListener("click", () => $("sidebar").classList.add("open"));
   $("close-sidebar").addEventListener("click", () => $("sidebar").classList.remove("open"));
@@ -646,7 +783,7 @@
     }, 250);
   });
   /* tapping the header opens a DM partner's profile; the members list opens ONLY from the "اعضا" button */
-  const headClick = () => { const g = groups[activeGroup], p = dmPeer(g); if (p) openUserProfile(p); };
+  const headClick = () => { const g = groups[activeGroup], p = dmPeer(g); if (p) openUserProfile(p); else if (g && g.type !== "dm") openGroupInfo(); };
   $("room-title").addEventListener("click", headClick); $("head-avatar").addEventListener("click", headClick);
   $("open-settings").addEventListener("click", () => { $("sidebar").classList.remove("open"); showModal("profile-modal"); });
   $("font-open").addEventListener("click", () => window.CRTheme.openFontPicker());
@@ -746,4 +883,13 @@
   }));
   const langLink = $("open-lang");   // language picker, comes back to this page afterwards
   if (langLink) langLink.href = "/lang?next=" + encodeURIComponent(location.pathname + location.search);
+
+  /* ---------- API برای فایل‌های دیگر (chat-bg.js, chat-plus.js, group-info.js) ---------- */
+  window.CRChat = {
+    cfg, socket, groups, users, esc, t, tf, nf, toast, sheet, showModal, hideModal, apiPost, groupApi, confirmSheet, copyText,
+    profileOf, avatarHtml, groupAvatarHtml, titleOf, roleOf, iAmAdmin, openMemberSheet, openUserProfile, startDm, dropGroup, live, LIVE_MSG,
+    get activeGroup() { return activeGroup; }, get online() { return online; },
+    refresh() { renderGroupList(); updateHeader(); renderMembers(); }
+  };
+  window.dispatchEvent(new Event("cr:ready"));
 })();
