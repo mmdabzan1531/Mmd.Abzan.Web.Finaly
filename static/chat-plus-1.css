@@ -51,12 +51,21 @@
 .rq button:hover,.rq button:active{transform:scale(1.25)}
 .pp-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:999px;z-index:120;font-size:.9rem}
 
-/* ایموجی‌های آیفون */
-img.ap-emoji{display:inline-block;width:1.25em;height:1.25em;vertical-align:-.25em;margin:0 .03em;object-fit:contain;-webkit-user-drag:none;user-select:none;pointer-events:none}
-.ep-grid button img.ap-emoji,.rq button img.ap-emoji{width:1.45rem;height:1.45rem;vertical-align:middle}
-.rq button img.ap-emoji{width:1.6rem;height:1.6rem}
-.rx-chip img.ap-emoji{width:1.1em;height:1.1em;vertical-align:middle}
-.ep-tabs button img.ap-emoji{width:1.2rem;height:1.2rem;vertical-align:middle}
+/* ایموجی‌های آیفون (اندازه قفل‌شده تا هیچ استایل دیگری خرابش نکند) */
+img.ap-emoji{display:inline-block!important;width:1.2em!important;height:1.2em!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+  margin:0 .04em!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;
+  vertical-align:-.2em!important;object-fit:contain!important;aspect-ratio:1/1;-webkit-user-drag:none;user-select:none;pointer-events:none;flex:none}
+.ep-grid button img.ap-emoji,.ep-tabs button img.ap-emoji{width:1.5rem!important;height:1.5rem!important;vertical-align:middle!important;margin:0!important}
+.rq button img.ap-emoji{width:1.7rem!important;height:1.7rem!important;vertical-align:middle!important;margin:0!important}
+.rx-chip img.ap-emoji{width:1.1em!important;height:1.1em!important;vertical-align:middle!important}
+.side-nav i img.ap-emoji{width:1.25em!important;height:1.25em!important}
+
+/* دکمه‌های ایموجی و سنجاق: آیکن خطی ساده */
+.emoji-btn,.attach-btn{display:inline-grid;place-items:center;padding:0;color:inherit;opacity:.82;transition:color .15s,opacity .15s,transform .15s}
+.emoji-btn svg,.attach-btn svg{width:22px;height:22px;display:block;pointer-events:none}
+.emoji-btn:hover,.attach-btn:hover,.emoji-btn:focus-visible,.attach-btn:focus-visible{opacity:1;color:#9b8cff}
+.emoji-btn:active,.attach-btn:active{transform:scale(.92)}
+.rx-add svg{width:15px;height:15px;display:block}
 
 /* پنل ایموجی چسبیده بالای نوار پیام */
 .ep.dock{max-width:none;border-radius:16px}
