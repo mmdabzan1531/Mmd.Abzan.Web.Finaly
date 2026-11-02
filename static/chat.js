@@ -5,6 +5,13 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
   const coarse = matchMedia("(pointer:coarse)").matches;
+  /* i18n helpers (from i18n.js): t = translate, tf = translate a {template}, nf = number in the UI language */
+  const LOC = window.CR_LOCALE || "fa-IR";
+  const t = window.t || (s => s);
+  const tf = window.tf || ((s, v) => t(s).replace(/\{(\w+)\}/g, (m, k) => (v && k in v ? v[k] : m)));
+  const nf = n => Number(n).toLocaleString(LOC);
+  ["group-name-head", "group-description", "ctx-text", "view-user-name", "view-user-id", "view-user-bio", "my-display"]
+    .forEach(id => { const e = $(id); if (e) e.setAttribute("data-no-i18n", ""); });   // user-written text is never translated
   const BASE_TITLE = "Chatroom | محمد مهدی آبزن";
 
   const noop = () => {};
@@ -28,28 +35,28 @@
 
   const profileOf = n => users[n] || {username: n, display_name: n, avatar: "🙂", bio: ""};
   const avatarHtml = u => u.avatar_url ? `<img src="${esc(u.avatar_url)}" alt="">` : esc(u.avatar || "🙂");
-  const fmtTime = iso => new Date(iso).toLocaleTimeString("fa-IR", {hour: "2-digit", minute: "2-digit"});
-  const fmtDay = iso => new Date(iso).toLocaleDateString("fa-IR", {weekday: "long", day: "numeric", month: "long"});
+  const fmtTime = iso => new Date(iso).toLocaleTimeString(LOC, {hour: "2-digit", minute: "2-digit"});
+  const fmtDay = iso => new Date(iso).toLocaleDateString(LOC, {weekday: "long", day: "numeric", month: "long"});
   const dayKey = iso => new Date(iso).toDateString();
 
   function toast(text) {
-    const t = $("toast"); t.textContent = text; t.classList.add("show");
-    clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2400);
+    const el = $("toast"); el.textContent = t(text); el.classList.add("show");
+    clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), 2400);
   }
   const showModal = id => $(id).classList.add("show");
   const hideModal = id => $(id).classList.remove("show");
   function sheet(title, bodyNode, actions) {
-    $("sheet-title").textContent = title;
+    $("sheet-title").textContent = t(title);
     const body = $("sheet-body"); body.innerHTML = ""; if (bodyNode) body.appendChild(bodyNode);
     const act = $("sheet-actions"); act.innerHTML = "";
-    actions.forEach(a => { const b = document.createElement("button"); b.className = "key " + (a.cls || ""); b.textContent = a.label; b.onclick = () => { hideModal("sheet"); a.fn && a.fn(); }; act.appendChild(b); });
+    actions.forEach(a => { const b = document.createElement("button"); b.className = "key " + (a.cls || ""); b.textContent = t(a.label); b.onclick = () => { hideModal("sheet"); a.fn && a.fn(); }; act.appendChild(b); });
     showModal("sheet");
   }
 
   /* ---------- connection ---------- */
   function setConn(state) {
     const el = $("conn"); el.dataset.state = state;
-    el.textContent = state === "off" ? "اتصال لحظه‌ای قطع است؛ پیام‌ها با روش جایگزین ارسال می‌شوند…" : "در حال اتصال…";
+    el.textContent = t(state === "off" ? "اتصال لحظه‌ای قطع است؛ پیام‌ها با روش جایگزین ارسال می‌شوند…" : "در حال اتصال…");
   }
   /* HTTP fallback: while the socket is down we poll every 3 s, so the chat never freezes. */
   let httpLoaded = "", polling = false;
@@ -96,9 +103,9 @@
     row.className = "msg" + (mine ? " mine" : "") + (cont ? " cont" : "") + (m.pending ? " pending" : "") + (m.failed ? " failed" : "");
     row.dataset.id = m.id;
     const av = {avatar: m.avatar || u.avatar, avatar_url: m.avatar_url || u.avatar_url};
-    const quote = m.reply_to ? `<button type="button" class="quote" data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${m.reply_gone ? "پیام حذف شده" : esc(m.reply_text)}</span></button>` : "";
-    const fwd = m.forwarded_from ? `<div class="fwd">فوروارد از ${esc(m.forwarded_from)}</div>` : "";
-    row.innerHTML = `<button type="button" class="avatar" data-profile="${esc(m.username)}" aria-label="پروفایل">${avatarHtml(av)}</button><div class="bubble" tabindex="0"><div class="who">${esc(m.display_name || u.display_name || m.username)}</div>${fwd}${quote}<div class="txt"></div><div class="foot"><span>${m.pending ? "در حال ارسال…" : m.failed ? "ارسال نشد · برای تلاش دوباره بزن ↻" : (m.edited ? "ویرایش‌شده" : "")}</span><time>${fmtTime(m.created_at)}</time></div></div>`;
+    const quote = m.reply_to ? `<button type="button" class="quote" data-no-i18n data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${m.reply_gone ? esc(t("پیام حذف شده")) : esc(m.reply_text)}</span></button>` : "";
+    const fwd = m.forwarded_from ? `<div class="fwd" data-no-i18n>${esc(tf("فوروارد از {name}", {name: m.forwarded_from}))}</div>` : "";
+    row.innerHTML = `<button type="button" class="avatar" data-profile="${esc(m.username)}" aria-label="${esc(t("پروفایل"))}">${avatarHtml(av)}</button><div class="bubble" tabindex="0"><div class="who" data-no-i18n>${esc(m.display_name || u.display_name || m.username)}</div>${fwd}${quote}<div class="txt" dir="auto" data-no-i18n></div><div class="foot"><span>${esc(t(m.pending ? "در حال ارسال…" : m.failed ? "ارسال نشد · برای تلاش دوباره بزن ↻" : (m.edited ? "ویرایش‌شده" : "")))}</span><time>${fmtTime(m.created_at)}</time></div></div>`;
     row.querySelector(".txt").textContent = m.text;
     return row;
   }
@@ -110,10 +117,10 @@
   }
   function renderAll() {
     feed.innerHTML = "";
-    if (!activeGroup) { feed.innerHTML = `<div class="welcome"><svg class="mark"><use href="#star"/></svg><h3>به Chatroom خوش آمدی</h3><p>یک گفتگو را از لیست انتخاب کن یا با جستجوی نام کاربری، پیام جدید شروع کن.</p></div>`; return; }
+    if (!activeGroup) { feed.innerHTML = `<div class="welcome"><svg class="mark"><use href="#star"/></svg><h3>${esc(t("به Chatroom خوش آمدی"))}</h3><p>${esc(t("یک گفتگو را از لیست انتخاب کن یا با جستجوی نام کاربری، پیام جدید شروع کن."))}</p></div>`; return; }
     if (!msgs.length) {
-      const g = groups[activeGroup] || {name: "گروه"};
-      feed.innerHTML = `<div class="empty"><svg class="mark"><use href="#star"/></svg><h3>${esc(titleOf(g))}</h3><p>هنوز پیامی نیست. اولین پیام را تو بفرست.</p></div>`;
+      const g = groups[activeGroup] || {name: t("گروه")};
+      feed.innerHTML = `<div class="empty"><svg class="mark"><use href="#star"/></svg><h3 data-no-i18n>${esc(titleOf(g))}</h3><p>${esc(t("هنوز پیامی نیست. اولین پیام را تو بفرست."))}</p></div>`;
       return;
     }
     let prev = null; msgs.forEach(m => { appendOne(m, prev); prev = m; });
@@ -128,14 +135,14 @@
   }
   function updateTitle() {
     const n = Object.values(unread).reduce((a, b) => a + b, 0);
-    document.title = (n ? `(${n.toLocaleString("fa-IR")}) ` : "") + BASE_TITLE;
+    document.title = (n ? `(${n.toLocaleString(LOC)}) ` : "") + BASE_TITLE;
   }
   document.addEventListener("visibilitychange", markRead);
 
   /* ---------- groups / members ---------- */
   const dmPeer = g => g && g.type === "dm" ? (g.members.find(n => n !== cfg.username) || cfg.username) : null;
-  const titleOf = g => { const p = dmPeer(g); return p ? (profileOf(p).display_name || p) : (g.name || "گروه"); };
-  const fmtShort = iso => new Date(iso).toDateString() === new Date().toDateString() ? fmtTime(iso) : new Date(iso).toLocaleDateString("fa-IR", {month: "short", day: "numeric"});
+  const titleOf = g => { const p = dmPeer(g); return p ? (profileOf(p).display_name || p) : (g.name || t("گروه")); };
+  const fmtShort = iso => new Date(iso).toDateString() === new Date().toDateString() ? fmtTime(iso) : new Date(iso).toLocaleDateString(LOC, {month: "short", day: "numeric"});
   let searchQ = "", searchRes = [];
   function renderGroupList() {
     const list = $("group-list"); list.innerHTML = "";
@@ -145,21 +152,21 @@
       .sort((a, b) => ((b[1].last && b[1].last.created_at) || "9").localeCompare((a[1].last && a[1].last.created_at) || "9"));
     items.forEach(([id, g]) => {
       const peer = dmPeer(g), pu = peer ? profileOf(peer) : null, last = g.last, n = unread[id] || 0;
-      const who = last ? (last.username === cfg.username ? "تو: " : (peer ? "" : (profileOf(last.username).display_name || last.username) + ": ")) : "";
-      const preview = last ? who + last.text : (peer ? "@" + peer : (g.description || "گفت‌وگوی گروهی"));
+      const who = last ? (last.username === cfg.username ? t("تو:") + " " : (peer ? "" : (profileOf(last.username).display_name || last.username) + ": ")) : "";
+      const preview = last ? who + last.text : (peer ? "@" + peer : (g.description || t("گفت‌وگوی گروهی")));
       const b = document.createElement("button");
       b.className = "group-item" + (id === activeGroup ? " active" : ""); b.dataset.groupId = id;
-      b.innerHTML = `<span class="avatar">${pu ? avatarHtml(pu) : esc([...(g.name || "گ")][0])}${peer && online.has(peer) ? '<i class="on-dot"></i>' : ""}</span><span class="group-text"><strong>${esc(titleOf(g))}</strong><small>${esc(preview)}</small></span><span class="group-meta">${last ? `<span>${fmtShort(last.created_at)}</span>` : ""}${n ? `<span class="badge">${n > 99 ? "۹۹+" : n.toLocaleString("fa-IR")}</span>` : ""}</span>`;
+      b.innerHTML = `<span class="avatar">${pu ? avatarHtml(pu) : esc([...(g.name || t("گروه"))][0])}${peer && online.has(peer) ? '<i class="on-dot"></i>' : ""}</span><span class="group-text" data-no-i18n><strong>${esc(titleOf(g))}</strong><small>${esc(preview)}</small></span><span class="group-meta">${last ? `<span>${fmtShort(last.created_at)}</span>` : ""}${n ? `<span class="badge">${n > 99 ? nf(99) + "+" : n.toLocaleString(LOC)}</span>` : ""}</span>`;
       b.addEventListener("click", () => selectGroup(id));
       list.appendChild(b);
     });
-    if (!items.length && !searchRes.length) list.innerHTML = `<div class="welcome"><p>${q ? "گفتگویی پیدا نشد." : "هنوز گفتگویی نداری.<br>نام کاربری کسی را بالا جستجو کن و پیام بده."}</p></div>`;
+    if (!items.length && !searchRes.length) list.innerHTML = `<div class="welcome"><p>${q ? esc(t("گفتگویی پیدا نشد.")) : esc(t("هنوز گفتگویی نداری.")) + "<br>" + esc(t("نام کاربری کسی را بالا جستجو کن و پیام بده."))}</p></div>`;
     if (searchRes.length) {
-      const h = document.createElement("div"); h.className = "side-sec"; h.textContent = "کاربران"; list.appendChild(h);
+      const h = document.createElement("div"); h.className = "side-sec"; h.textContent = t("کاربران"); list.appendChild(h);
       searchRes.forEach(u => {
         users[u.username] = Object.assign(users[u.username] || {}, u);
         const b = document.createElement("button"); b.className = "group-item";
-        b.innerHTML = `<span class="avatar">${avatarHtml(u)}</span><span class="group-text"><strong>${esc(u.display_name || u.username)}</strong><small>@${esc(u.username)}</small></span>`;
+        b.innerHTML = `<span class="avatar">${avatarHtml(u)}</span><span class="group-text" data-no-i18n><strong>${esc(u.display_name || u.username)}</strong><small>@${esc(u.username)}</small></span>`;
         b.addEventListener("click", () => startDm(u.username)); list.appendChild(b);
       });
     }
@@ -170,20 +177,20 @@
     names.forEach(name => {
       const u = profileOf(name), row = document.createElement("button");
       row.className = "member"; row.type = "button";
-      row.innerHTML = `<span class="avatar">${avatarHtml(u)}</span><span class="member-info"><strong>${esc(u.display_name || name)}</strong><span>@${esc(name)}</span></span><i class="dot ${online.has(name) ? "on" : ""}"></i>`;
+      row.innerHTML = `<span class="avatar">${avatarHtml(u)}</span><span class="member-info" data-no-i18n><strong>${esc(u.display_name || name)}</strong><span>@${esc(name)}</span></span><i class="dot ${online.has(name) ? "on" : ""}"></i>`;
       row.addEventListener("click", () => openUserProfile(name));
       list.appendChild(row);
     });
-    $("member-count").textContent = names.length.toLocaleString("fa-IR");
-    $("online-count").textContent = names.filter(n => online.has(n)).length.toLocaleString("fa-IR");
+    $("member-count").textContent = names.length.toLocaleString(LOC);
+    $("online-count").textContent = names.filter(n => online.has(n)).length.toLocaleString(LOC);
   }
   function updateHeader() {
     const g = groups[activeGroup], peer = dmPeer(g);
     document.body.dataset.kind = !g ? "none" : (peer ? "dm" : "group");
     if (!g) { $("group-name-head").textContent = "Chatroom"; $("group-description").textContent = ""; $("head-avatar").innerHTML = ""; return; }
     $("group-name-head").textContent = titleOf(g);
-    $("group-description").textContent = peer ? (online.has(peer) ? "آنلاین" : "@" + peer) : (g.description || "گفت‌وگوی گروهی");
-    $("head-avatar").innerHTML = peer ? avatarHtml(profileOf(peer)) : esc([...(g.name || "گ")][0]);
+    $("group-description").textContent = peer ? (online.has(peer) ? t("آنلاین") : "@" + peer) : (g.description || t("گفت‌وگوی گروهی"));
+    $("head-avatar").innerHTML = peer ? avatarHtml(profileOf(peer)) : esc([...(g.name || t("گروه"))][0]);
     $("edit-group-name").value = g.name || ""; $("edit-group-description").value = g.description || "";
   }
   function selectGroup(id) {
@@ -191,7 +198,7 @@
     activeGroup = id; httpLoaded = ""; msgs = []; hasMore = false; clearCtx(); closeMenu(); typers.clear(); renderTyping();
     try { localStorage.setItem(LAST_KEY, id); } catch (_) {}
     history.replaceState(null, "", "?group=" + encodeURIComponent(id));
-    feed.innerHTML = `<div class="empty"><p>در حال بارگذاری…</p></div>`;
+    feed.innerHTML = `<div class="empty"><p>${esc(t("در حال بارگذاری…"))}</p></div>`;
     updateHeader(); renderGroupList(); renderMembers();
     socket.emit("select_group", {group_id: id}); if (!live()) setTimeout(pollHttp, 50);
     $("sidebar").classList.remove("open"); $("people").classList.remove("open");
@@ -261,7 +268,8 @@
   });
   function renderTyping() {
     const names = [...typers.keys()].map(n => profileOf(n).display_name || n), el = $("typing");
-    el.textContent = !names.length ? "" : names.length > 2 ? "چند نفر در حال نوشتن‌اند…" : names.join(" و ") + " در حال نوشتن…";
+    el.textContent = !names.length ? "" : names.length > 2 ? t("چند نفر در حال نوشتن‌اند…") :
+      names.length === 2 ? tf("{a} و {b} در حال نوشتن…", {a: names[0], b: names[1]}) : tf("{a} در حال نوشتن…", {a: names[0]});
     el.classList.toggle("on", names.length > 0);
   }
 
@@ -269,7 +277,7 @@
   function syncJump() {
     const away = !nearBottom(); $("jump").hidden = !away;
     if (!away) awayCount = 0;
-    const b = $("jump-n"); b.hidden = !awayCount; b.textContent = awayCount.toLocaleString("fa-IR");
+    const b = $("jump-n"); b.hidden = !awayCount; b.textContent = awayCount.toLocaleString(LOC);
   }
   feed.addEventListener("scroll", () => {
     syncJump(); closeMenu();
@@ -285,7 +293,7 @@
   function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; }
   function setCtx(kind, id, name, text) {
     ctx = {kind, id, name, text};
-    $("ctx-kind").textContent = kind === "edit" ? "ویرایش پیام" : "پاسخ به " + name;
+    $("ctx-kind").textContent = kind === "edit" ? t("ویرایش پیام") : tf("پاسخ به {name}", {name});
     $("ctx-text").textContent = text.slice(0, 80); $("ctx-bar").hidden = false;
   }
   function clearCtx() { if (ctx && ctx.kind === "edit") { input.value = ""; autosize(); } ctx = null; $("ctx-bar").hidden = true; }
@@ -313,8 +321,8 @@
   function viaSocket(p) {
     return new Promise(res => {
       if (!live()) return res(null);
-      let done = false; const t = setTimeout(() => { if (!done) res(null); }, 5000);
-      socket.emit("send_message", p, r => { done = true; clearTimeout(t); res(r || null); });
+      let done = false; const tm = setTimeout(() => { if (!done) res(null); }, 5000);
+      socket.emit("send_message", p, r => { done = true; clearTimeout(tm); res(r || null); });
     });
   }
   async function viaHttp(p) {
@@ -369,7 +377,7 @@
     const mine = m.username === cfg.username;
     menu.innerHTML = [["reply", "↩", "پاسخ"], ["copy", "⧉", "کپی"], ["forward", "➦", "فوروارد"]]
       .concat(mine ? [["edit", "✎", "ویرایش"], ["delete", "✕", "حذف"]] : [])
-      .map(([a, i, l]) => `<button type="button" role="menuitem" data-act="${a}" class="${a === "delete" ? "del" : ""}"><i>${i}</i>${l}</button>`).join("");
+      .map(([a, i, l]) => `<button type="button" role="menuitem" data-act="${a}" class="${a === "delete" ? "del" : ""}"><i>${i}</i>${esc(t(l))}</button>`).join("");
     menu.classList.add("open");
     const r = row.querySelector(".bubble").getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
     let top = r.bottom + 6; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 6);
@@ -410,16 +418,16 @@
   function startEdit(m) { setCtx("edit", m.id, "", m.text); input.value = m.text; autosize(); input.focus(); }
   async function copyMsg(m) {
     try { await navigator.clipboard.writeText(m.text); toast("کپی شد"); }
-    catch (_) { const t = document.createElement("textarea"); t.value = m.text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); toast("کپی شد"); }
+    catch (_) { const ta = document.createElement("textarea"); ta.value = m.text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); toast("کپی شد"); }
   }
   function askDelete(m) { sheet("این پیام حذف شود؟", null, [{label: "نه", fn: null}, {label: "حذف", cls: "hot", fn: () => live() ? socket.emit("delete_message", {id: m.id}) : toast(LIVE_MSG)}]); }
   function askForward(m) {
     const others = Object.entries(groups).filter(([id]) => id !== activeGroup);
     const box = document.createElement("div");
-    if (!others.length) box.textContent = "برای فوروارد باید عضو گروه دیگری هم باشی.";
+    if (!others.length) box.textContent = t("برای فوروارد باید عضو گروه دیگری هم باشی.");
     others.forEach(([id, g]) => {
       const b = document.createElement("button"); b.type = "button"; b.className = "pick";
-      b.innerHTML = `<span class="group-tile">${esc([...(g.name || "گ")][0])}</span><strong>${esc(titleOf(g))}</strong>`;
+      b.innerHTML = `<span class="group-tile">${esc([...(g.name || t("گروه"))][0])}</span><strong data-no-i18n>${esc(titleOf(g))}</strong>`;
       b.onclick = () => { hideModal("sheet"); if (!live()) return toast(LIVE_MSG); socket.emit("forward_message", {id: m.id, target_group: id}); toast("فوروارد شد"); };
       box.appendChild(b);
     });
@@ -438,13 +446,13 @@
   $("close-members").addEventListener("click", () => $("people").classList.remove("open"));
 
   async function post(url, opts, statusEl, okText, modal) {
-    statusEl.textContent = "در حال ذخیره…";
+    statusEl.textContent = t("در حال ذخیره…");
     try {
       const r = await fetch(url, opts), d = await r.json();
       if (!r.ok) throw new Error(d.error || "خطا");
-      statusEl.textContent = okText; if (modal) setTimeout(() => hideModal(modal), 600);
+      statusEl.textContent = t(okText); if (modal) setTimeout(() => hideModal(modal), 600);
       return d;
-    } catch (err) { statusEl.textContent = err.message; return null; }
+    } catch (err) { statusEl.textContent = t(err instanceof TypeError ? "اتصال به سرور برقرار نشد. اینترنتت را بررسی کن." : err.message); return null; }
   }
   $("save-profile").addEventListener("click", async () => {
     const fd = new FormData();
@@ -468,8 +476,8 @@
       const r = await fetch(`/api/user/${encodeURIComponent(name)}`), d = await r.json(); if (!r.ok) throw 0;
       const u = d.user; users[u.username] = u;
       $("view-user-avatar").innerHTML = avatarHtml(u); $("view-user-name").textContent = u.display_name || u.username;
-      $("view-user-id").textContent = "@" + u.username; $("view-user-bio").textContent = u.bio || "هنوز بیویی ننوشته.";
-      const c = []; if (u.phone) c.push(`<div><b>موبایل:</b><span dir="ltr">${esc(u.phone)}</span></div>`); if (u.email) c.push(`<div><b>ایمیل:</b><span dir="ltr">${esc(u.email)}</span></div>`);
+      $("view-user-id").textContent = "@" + u.username; $("view-user-bio").textContent = u.bio || t("هنوز بیویی ننوشته.");
+      const c = []; if (u.phone) c.push(`<div><b>${esc(t("موبایل:"))}</b><span dir="ltr">${esc(u.phone)}</span></div>`); if (u.email) c.push(`<div><b>${esc(t("ایمیل:"))}</b><span dir="ltr">${esc(u.email)}</span></div>`);
       $("view-contact").innerHTML = c.join(""); $("view-dm").hidden = name === cfg.username; $("view-dm").onclick = () => startDm(name);
       showModal("user-view-modal");
     } catch (_) { toast("پروفایل باز نشد."); }
@@ -488,7 +496,7 @@
   });
 
   updateHeader(); renderGroupList(); renderMembers(); renderAll();
-  if (!activeGroup) { renderAll(); $("sidebar").classList.add("open"); } else feed.innerHTML = `<div class="empty"><p>در حال بارگذاری…</p></div>`;
+  if (!activeGroup) { renderAll(); $("sidebar").classList.add("open"); } else feed.innerHTML = `<div class="empty"><p>${esc(t("در حال بارگذاری…"))}</p></div>`;
 
   /* ---------- search, DMs, settings ---------- */
   async function startDm(name) {
@@ -513,4 +521,6 @@
   $("open-settings").addEventListener("click", () => { $("sidebar").classList.remove("open"); showModal("profile-modal"); });
   $("font-open").addEventListener("click", () => window.CRTheme.openFontPicker());
   $("theme-open").addEventListener("click", () => window.CRTheme.openPicker());
+  const langLink = $("open-lang");   // language picker, comes back to this page afterwards
+  if (langLink) langLink.href = "/lang?next=" + encodeURIComponent(location.pathname + location.search);
 })();
