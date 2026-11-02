@@ -89,5 +89,5 @@ window.CHATROOM = {
 })();
 </script>
 <script src="{{ url_for('static', filename='pwa.js') }}?v={{ ASSET_V }}"></script>
-<script>window.addEventListener("load",function(){setTimeout(function(){var s=document.createElement("script");s.src="{{ url_for('static', filename='chat-plus.js') }}?v={{ ASSET_V }}";document.body.appendChild(s);},300);});</script>
+<script src="{{ url_for('static', filename='chat-plus.js') }}?v={{ ASSET_V }}"></script>
 </body></html>
