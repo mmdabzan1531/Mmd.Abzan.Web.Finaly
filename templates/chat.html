@@ -49,7 +49,7 @@
   <label>شماره و ایمیل ثبت‌شده</label><div class="contact"><div><b>موبایل:</b><span dir="ltr" data-no-i18n>{{ current_user.phone or "—" }}</span></div><div><b>ایمیل:</b><span dir="ltr" data-no-i18n>{{ current_user.email or "—" }}</span></div></div>
   <div class="row2"><input type="checkbox" id="profile-show-phone" {{ "checked" if current_user.show_phone }}><label for="profile-show-phone">نمایش شماره در پروفایل</label></div>
   <div class="row2"><input type="checkbox" id="profile-show-email" {{ "checked" if current_user.show_email }}><label for="profile-show-email">نمایش ایمیل در پروفایل</label></div>
-  <div class="row2"><button type="button" class="key small" id="theme-open">🎨 تم‌ها</button><button type="button" class="key small" id="font-open">🔤 فونت‌ها</button></div>
+  <div class="row2"><button type="button" class="key small" id="theme-open">🎨 تم‌ها</button><button type="button" class="key small" id="font-open">🔤 فونت‌ها</button><button type="button" class="key small" id="cb-open-me">🖼 پس‌زمینه چت</button></div>
   <div class="row2"><a class="key small" href="/support#support">🛟 پشتیبانی</a><a class="key small" href="/about#about">ℹ درباره ما</a></div>
   <div class="actions"><button class="key" data-close="profile-modal">بستن</button><button class="key hot" id="save-profile">ذخیره</button></div><p class="status" id="profile-status"></p></section></div>
 <div class="modal" id="user-view-modal"><section class="card center"><div class="avatar xl" id="view-user-avatar">🙂</div><h2 id="view-user-name" data-no-i18n></h2><p class="handle" id="view-user-id" data-no-i18n></p><p class="bio" id="view-user-bio" data-no-i18n></p><div class="contact" id="view-contact"></div><div class="actions"><button class="key" data-close="user-view-modal">بستن</button><button class="key hot" id="view-dm">ارسال پیام</button></div></section></div>
@@ -62,6 +62,7 @@
   <label>توضیحات</label><textarea id="edit-group-description" maxlength="180" rows="3"></textarea>
   <input id="group-invite-url" type="hidden"><button type="button" id="copy-invite" hidden aria-hidden="true" tabindex="-1"></button>
   <div id="banned-wrap" hidden><label>مسدودشده‌ها</label><div id="banned-list" class="banned-list"></div></div>
+  <label>ظاهر گروه</label><div class="row2"><button type="button" class="key small" id="cb-open-group">🖼 پس‌زمینه گروه (برای همه)</button></div>
   <div class="row2 group-extra"><button type="button" class="key small" id="reset-invite">لینک دعوت جدید</button><button type="button" class="key small" id="leave-group">ترک گروه</button><button type="button" class="key small del" id="delete-group">حذف گروه</button></div>
   <div class="actions"><button class="key" data-close="group-modal">بستن</button><button class="key hot" id="save-group">ذخیره</button></div><p class="status" id="group-status"></p></section></div>
 <div class="modal" id="sheet"><section class="card"><h2 id="sheet-title"></h2><div id="sheet-body"></div><div class="actions" id="sheet-actions"></div></section></div>
