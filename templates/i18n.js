@@ -1,4 +1,5 @@
 /* Chatroom i18n — translates the (Persian) UI on the client. Dictionary: i18n-data.js
+   Helpers for scripts: t(text), tf(template, {vars}), nf(number), CR_LANG, CR_LOCALE.
    Language is read from the "lang" cookie that the server sets on /lang/<code>. */
 (function () {
   "use strict";
@@ -8,6 +9,12 @@
   var m = document.cookie.match(/(?:^|;\s*)lang=([a-z]{2})/);
   var lang = m && DIRS[m[1]] ? m[1] : "fa";
   window.CR_LANG = lang;
+  var LOCALES = { fa: "fa-IR", ar: "ar-EG", en: "en-US", tr: "tr-TR", ru: "ru-RU", es: "es-ES", fr: "fr-FR", zh: "zh-CN" };
+  window.CR_LOCALE = LOCALES[lang];                                   // for toLocaleString / toLocaleTimeString ...
+  window.nf = function (n) { return Number(n).toLocaleString(window.CR_LOCALE); };   // number in the UI language
+  window.tf = function (s, vars) {                                    // translate a template, then fill its {placeholders}
+    return window.t(s).replace(/\{(\w+)\}/g, function (m, k) { return vars && k in vars ? vars[k] : m; });
+  };
   window.t = function (s) { return s; };
   if (root.hasAttribute("data-keep-dir")) return;                     // the language picker page itself
   root.lang = lang;
@@ -29,7 +36,8 @@
   (window.I18N_PREFIX || []).forEach(function (p) { PX.push([norm(p[0]), p[1]]); });
 
   function dg(s) {                                                   // Persian digits -> Latin (except Arabic UI)
-    return lang === "ar" ? s : s.replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); });
+    if (lang === "ar") return s.replace(/[۰-۹]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 0x0660); });
+    return s.replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); });
   }
 
   function one(n) {
