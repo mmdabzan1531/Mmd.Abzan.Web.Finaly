@@ -13,6 +13,8 @@
   ["group-name-head", "group-description", "ctx-text", "view-user-name", "view-user-id", "view-user-bio", "my-display"]
     .forEach(id => { const e = $(id); if (e) e.setAttribute("data-no-i18n", ""); });   // user-written text is never translated
   const BASE_TITLE = "Chatroom | محمد مهدی آبزن";
+  const BOT_USER = "chatroom_bot";                       // its messages come from the server in Persian and are translated
+  const MAX_MB = (cfg && cfg.maxFileMb) || 15;           // must match CHATROOM_MAX_FILE_MB on the server
 
   const noop = () => {};
   const socket = typeof io === "function" ? io({reconnectionDelayMax: 4000}) : {connected: false, on: noop, emit: noop, io: {on: noop}};
@@ -38,6 +40,31 @@
   const fmtTime = iso => new Date(iso).toLocaleTimeString(LOC, {hour: "2-digit", minute: "2-digit"});
   const fmtDay = iso => new Date(iso).toLocaleDateString(LOC, {weekday: "long", day: "numeric", month: "long"});
   const dayKey = iso => new Date(iso).toDateString();
+  const fmtSize = n => n >= 1048576 ? (n / 1048576).toLocaleString(LOC, {maximumFractionDigits: 1}) + " MB" : Math.max(1, Math.round(n / 1024)).toLocaleString(LOC) + " KB";
+
+  /* roles: owner > admin > member (the server decides; this only shows / hides buttons) */
+  const roleOf = (g, n) => !g ? null : g.type === "dm" ? "member" : g.owner === n ? "owner" : (g.admins || []).includes(n) ? "admin" : (g.members || []).includes(n) ? "member" : null;
+  const iAmAdmin = g => ["owner", "admin"].includes(roleOf(g, cfg.username));
+
+  /* attachments */
+  const PV = ["📷 عکس", "🎞 ویدیو", "🎵 صوت"], pv = x => PV.includes(x) ? t(x) : x;     // translate only the built-in preview labels
+  const previewOf = m => m.text ? m.text.slice(0, 60) : (m.attach ? ({image: "📷 عکس", video: "🎞 ویدیو", audio: "🎵 صوت"}[m.attach.kind] || "📎 " + (m.attach.name || "")).slice(0, 60) : (m.up ? "📎 " + m.up.name : ""));
+  const kindOf = f => /^image\//.test(f.type) ? "image" : /^video\//.test(f.type) ? "video" : /^audio\//.test(f.type) ? "audio" : "file";
+  const kindIcon = f => ({image: "🖼", video: "🎞", audio: "🎵", file: "📎"})[kindOf(f)];
+  function attachHtml(a) {
+    if (!a || !a.url) return "";
+    const url = esc(a.url), name = esc(a.name || "");
+    if (a.kind === "image") return `<a class="att att-img" href="${url}" data-lightbox="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${name}" loading="lazy"></a>`;
+    if (a.kind === "video") return `<div class="att"><video src="${url}" controls preload="metadata" playsinline></video></div>`;
+    if (a.kind === "audio") return `<div class="att"><audio src="${url}" controls preload="none"></audio></div>`;
+    return `<a class="att att-file" href="${url}" download="${name}" data-no-i18n><i>📎</i><span><b>${name}</b><small>${esc(fmtSize(a.size || 0))}</small></span></a>`;
+  }
+  const upHtml = m => `<div class="att att-file up" data-no-i18n><i>⏳</i><span><b>${esc(m.up.name)}</b><small class="up-pct">${esc(nf(m.up.pct || 0))}%</small><span class="up-bar"><i style="width:${m.up.pct || 0}%"></i></span></span></div>`;
+  function updateProgress(cid, pct) {
+    const row = feed.querySelector(`[data-id="p-${CSS.escape(cid)}"]`); if (!row) return;
+    const a = row.querySelector(".up-pct"), b = row.querySelector(".up-bar i");
+    if (a) a.textContent = nf(pct) + "%"; if (b) b.style.width = pct + "%";
+  }
 
   function toast(text) {
     const el = $("toast"); el.textContent = t(text); el.classList.add("show");
@@ -103,10 +130,12 @@
     row.className = "msg" + (mine ? " mine" : "") + (cont ? " cont" : "") + (m.pending ? " pending" : "") + (m.failed ? " failed" : "");
     row.dataset.id = m.id;
     const av = {avatar: m.avatar || u.avatar, avatar_url: m.avatar_url || u.avatar_url};
-    const quote = m.reply_to ? `<button type="button" class="quote" data-no-i18n data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${m.reply_gone ? esc(t("پیام حذف شده")) : esc(m.reply_text)}</span></button>` : "";
+    const quote = m.reply_to ? `<button type="button" class="quote" data-no-i18n data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${m.reply_gone ? esc(t("پیام حذف شده")) : esc(m.reply_text === "📎 پیوست" ? t("📎 پیوست") : m.reply_text)}</span></button>` : "";
     const fwd = m.forwarded_from ? `<div class="fwd" data-no-i18n>${esc(tf("فوروارد از {name}", {name: m.forwarded_from}))}</div>` : "";
-    row.innerHTML = `<button type="button" class="avatar" data-profile="${esc(m.username)}" aria-label="${esc(t("پروفایل"))}">${avatarHtml(av)}</button><div class="bubble" tabindex="0"><div class="who" data-no-i18n>${esc(m.display_name || u.display_name || m.username)}</div>${fwd}${quote}<div class="txt" dir="auto" data-no-i18n></div><div class="foot"><span>${esc(t(m.pending ? "در حال ارسال…" : m.failed ? "ارسال نشد · برای تلاش دوباره بزن ↻" : (m.edited ? "ویرایش‌شده" : "")))}</span><time>${fmtTime(m.created_at)}</time></div></div>`;
-    row.querySelector(".txt").textContent = m.text;
+    row.innerHTML = `<button type="button" class="avatar" data-profile="${esc(m.username)}" aria-label="${esc(t("پروفایل"))}">${avatarHtml(av)}</button><div class="bubble" tabindex="0"><div class="who" data-no-i18n>${esc(m.display_name || u.display_name || m.username)}</div>${fwd}${quote}${m.up ? upHtml(m) : attachHtml(m.attach)}<div class="txt" dir="auto" data-no-i18n></div><div class="foot"><span>${esc(t(m.pending ? "در حال ارسال…" : m.failed ? "ارسال نشد · برای تلاش دوباره بزن ↻" : (m.edited ? "ویرایش‌شده" : "")))}</span><time>${fmtTime(m.created_at)}</time></div></div>`;
+    const txt = row.querySelector(".txt");
+    if (m.username === BOT_USER) txt.removeAttribute("data-no-i18n");     // bot messages are translated, people's messages never
+    txt.textContent = m.text || ""; if (!m.text) txt.hidden = true;
     return row;
   }
   function appendOne(m, prev) {
@@ -153,7 +182,7 @@
     items.forEach(([id, g]) => {
       const peer = dmPeer(g), pu = peer ? profileOf(peer) : null, last = g.last, n = unread[id] || 0;
       const who = last ? (last.username === cfg.username ? t("تو:") + " " : (peer ? "" : (profileOf(last.username).display_name || last.username) + ": ")) : "";
-      const preview = last ? who + last.text : (peer ? "@" + peer : (g.description || t("گفت‌وگوی گروهی")));
+      const preview = last ? who + pv(last.text) : (peer ? "@" + peer : (g.description || t("گفت‌وگوی گروهی")));
       const b = document.createElement("button");
       b.className = "group-item" + (id === activeGroup ? " active" : ""); b.dataset.groupId = id;
       b.innerHTML = `<span class="avatar">${pu ? avatarHtml(pu) : esc([...(g.name || t("گروه"))][0])}${peer && online.has(peer) ? '<i class="on-dot"></i>' : ""}</span><span class="group-text" data-no-i18n><strong>${esc(titleOf(g))}</strong><small>${esc(preview)}</small></span><span class="group-meta">${last ? `<span>${fmtShort(last.created_at)}</span>` : ""}${n ? `<span class="badge">${n > 99 ? nf(99) + "+" : n.toLocaleString(LOC)}</span>` : ""}</span>`;
@@ -173,12 +202,14 @@
   }
   function renderMembers() {
     const g = groups[activeGroup], list = $("members-list"); list.innerHTML = "";
-    const names = [...(g ? g.members : [])].sort((a, b) => (online.has(b) - online.has(a)) || a.localeCompare(b));
+    const rank = {owner: 0, admin: 1, member: 2};
+    const names = [...(g ? g.members : [])].sort((x, y) => (rank[roleOf(g, x)] - rank[roleOf(g, y)]) || (online.has(y) - online.has(x)) || x.localeCompare(y));
     names.forEach(name => {
-      const u = profileOf(name), row = document.createElement("button");
+      const u = profileOf(name), role = roleOf(g, name), row = document.createElement("button");
       row.className = "member"; row.type = "button";
-      row.innerHTML = `<span class="avatar">${avatarHtml(u)}</span><span class="member-info" data-no-i18n><strong>${esc(u.display_name || name)}</strong><span>@${esc(name)}</span></span><i class="dot ${online.has(name) ? "on" : ""}"></i>`;
-      row.addEventListener("click", () => openUserProfile(name));
+      const badge = g && g.type !== "dm" && role !== "member" ? `<em class="role ${role}">${esc(t(role === "owner" ? "مالک" : "ادمین"))}</em>` : "";
+      row.innerHTML = `<span class="avatar">${avatarHtml(u)}</span><span class="member-info" data-no-i18n><strong>${esc(u.display_name || name)}</strong><span>@${esc(name)}</span></span>${badge}<i class="dot ${online.has(name) ? "on" : ""}"></i>`;
+      row.addEventListener("click", () => name === cfg.username || !g || g.type === "dm" ? openUserProfile(name) : openMemberSheet(name));
       list.appendChild(row);
     });
     $("member-count").textContent = names.length.toLocaleString(LOC);
@@ -222,7 +253,7 @@
   function onNewMessage(m) {
     setMax([m]);
     if (!groups[m.group_id]) return;
-    groups[m.group_id].last = {username: m.username, text: m.text.slice(0, 60), created_at: m.created_at, seq: m.seq}; renderGroupList();
+    groups[m.group_id].last = {username: m.username, text: previewOf(m), created_at: m.created_at, seq: m.seq}; renderGroupList();
     if (m.group_id !== activeGroup) {
       if (m.username !== cfg.username) { unread[m.group_id] = (unread[m.group_id] || 0) + 1; renderGroupList(); updateTitle(); }
       return;
@@ -249,7 +280,25 @@
   });
   socket.on("action_error", d => toast(d.error || "عملیات انجام نشد."));
   socket.on("presence", d => { online = new Set(d.online || []); renderMembers(); renderGroupList(); updateHeader(); });
-  socket.on("groups_snapshot", d => { Object.assign(users, d.users || {}); Object.assign(groups, d.groups || {}); renderGroupList(); updateHeader(); renderMembers(); });
+  function dropGroup(id) {                         // left, kicked out or deleted
+    if (!groups[id]) return;
+    delete groups[id]; delete unread[id];
+    if (activeGroup === id) {
+      activeGroup = ""; msgs = []; hasMore = false; ctx = null; $("ctx-bar").hidden = true; closeMenu(); typers.clear(); renderTyping();
+      try { localStorage.removeItem(LAST_KEY); } catch (_) {}
+      history.replaceState(null, "", location.pathname); $("sidebar").classList.add("open"); $("people").classList.remove("open");
+    }
+    renderAll(); updateHeader(); renderGroupList(); renderMembers(); updateTitle();
+  }
+  socket.on("groups_snapshot", d => {
+    Object.assign(users, d.users || {});
+    const fresh = d.groups || {};
+    Object.keys(groups).forEach(id => { if (!fresh[id]) dropGroup(id); });
+    Object.keys(fresh).forEach(id => { groups[id] = Object.assign({}, groups[id], fresh[id]); });
+    renderGroupList(); updateHeader(); renderMembers();
+  });
+  socket.on("removed_from_group", d => { if (d && groups[d.id]) { dropGroup(d.id); toast("از این گروه حذف شدی."); } });
+  socket.on("group_deleted", d => { if (d && groups[d.id]) { dropGroup(d.id); toast("گروه حذف شد."); } });
   socket.on("group_updated", d => {
     if (!d || !d.group) return; groups[d.id] = Object.assign({}, groups[d.id], d.group); renderGroupList();
     if (d.id === activeGroup) { updateHeader(); renderMembers(); }
@@ -298,6 +347,47 @@
   }
   function clearCtx() { if (ctx && ctx.kind === "edit") { input.value = ""; autosize(); } ctx = null; $("ctx-bar").hidden = true; }
   $("cancel-ctx").addEventListener("click", clearCtx);
+  /* ---- attachments: pick a file (or paste an image), optional caption, upload with progress ---- */
+  let pendingFile = null;
+  const uploads = new Map();                       // cid -> {file}  (kept so a failed upload can be retried)
+  const attachInput = $("attach-input"), attachBar = $("attach-bar");
+  function setAttach(f) {
+    pendingFile = f || null; attachBar.hidden = !f;
+    if (f) { $("attach-name").textContent = f.name; $("attach-size").textContent = fmtSize(f.size); $("attach-ico").textContent = kindIcon(f); }
+    else attachInput.value = "";
+  }
+  function pickFile(f) {
+    if (!f) return;
+    if (!activeGroup) return void toast("یک گفتگو را از لیست انتخاب کن یا با جستجوی نام کاربری، پیام جدید شروع کن.");
+    if (!f.size) return void toast("فایل خالی است.");
+    if (f.size > MAX_MB * 1048576) return void toast("حجم فایل بیشتر از " + MAX_MB + " مگابایت است.");
+    setAttach(f); input.focus();
+  }
+  $("attach-btn").addEventListener("click", () => attachInput.click());
+  attachInput.addEventListener("change", () => pickFile(attachInput.files[0]));
+  $("attach-cancel").addEventListener("click", () => setAttach(null));
+  input.addEventListener("paste", e => { const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0]; if (f) { e.preventDefault(); pickFile(f); } });
+  function startUpload(p) {
+    const u = uploads.get(p.cid); if (!u) return;
+    const fd = new FormData();
+    fd.append("file", u.file); fd.append("group_id", p.group_id); fd.append("text", p.text || ""); fd.append("reply_to", p.reply_to || ""); fd.append("cid", p.cid);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload"); xhr.withCredentials = true; xhr.timeout = 300000;
+    xhr.upload.onprogress = e => { if (e.lengthComputable) { p.up.pct = Math.round(e.loaded / e.total * 100); updateProgress(p.cid, p.up.pct); } };
+    const fail = err => {
+      const i = msgs.findIndex(x => x.cid === p.cid);
+      if (i >= 0 && msgs[i].pending) { msgs[i].pending = false; msgs[i].failed = true; keepScroll(renderAll); }
+      toast(err || "پیام ارسال نشد؛ اینترنتت را بررسی کن و روی پیام بزن.");
+    };
+    xhr.onerror = () => fail(); xhr.ontimeout = () => fail();
+    xhr.onload = () => {
+      if (xhr.status === 401) return void (location.href = "/");
+      let d = null; try { d = JSON.parse(xhr.responseText); } catch (_) {}
+      if (xhr.status >= 200 && xhr.status < 300 && d && d.ok && d.message) { uploads.delete(p.cid); settle(p.cid, d.message); }
+      else fail(d && d.error);
+    };
+    xhr.send(fd);
+  }
   let lastTyping = 0;
   input.addEventListener("input", () => {
     autosize();
@@ -338,7 +428,7 @@
     if (i < 0) return;                            // the live broadcast already did it
     if (msgs.some(x => x.id === m.id)) msgs.splice(i, 1); else msgs[i] = m;
     setMax([m]); keepScroll(renderAll);
-    if (groups[m.group_id]) { groups[m.group_id].last = {username: m.username, text: m.text.slice(0, 60), created_at: m.created_at, seq: m.seq}; renderGroupList(); }
+    if (groups[m.group_id]) { groups[m.group_id].last = {username: m.username, text: previewOf(m), created_at: m.created_at, seq: m.seq}; renderGroupList(); }
   }
   async function deliver(p) {
     const payload = {text: p.text, group_id: p.group_id, reply_to: p.reply_to, cid: p.cid};
@@ -352,20 +442,22 @@
   }
   function retry(m) {
     m.failed = false; m.pending = true; keepScroll(renderAll);
+    if (uploads.has(m.cid)) { if (m.up) m.up.pct = 0; return startUpload(m); }
     deliver(m);
   }
 
   form.addEventListener("submit", e => {
     e.preventDefault();
-    const text = input.value.trim(); if (!text) return;
-    if (ctx && ctx.kind === "edit") { if (!live()) return toast(LIVE_MSG); socket.emit("edit_message", {id: ctx.id, text}); ctx = null; $("ctx-bar").hidden = true; input.value = ""; autosize(); return; }
+    const text = input.value.trim(); if (!text && !pendingFile) return;
+    if (ctx && ctx.kind === "edit") { if (!text) return; if (!live()) return toast(LIVE_MSG); socket.emit("edit_message", {id: ctx.id, text}); ctx = null; $("ctx-bar").hidden = true; input.value = ""; autosize(); return; }
     const cid = uid(), me = users[cfg.username] || cfg.me, reply = ctx && ctx.kind === "reply" ? ctx : null;
     const p = {id: "p-" + cid, cid, pending: true, group_id: activeGroup, username: cfg.username, display_name: me.display_name,
       avatar: me.avatar, avatar_url: me.avatar_url, text, created_at: new Date().toISOString(),
       reply_to: reply ? reply.id : "", reply_name: reply ? reply.name : "", reply_text: reply ? reply.text : ""};
+    if (pendingFile) { p.up = {name: pendingFile.name, size: pendingFile.size, pct: 0}; uploads.set(cid, {file: pendingFile}); }
     if (!msgs.length) feed.innerHTML = "";
     const prev = msgs[msgs.length - 1]; msgs.push(p); appendOne(p, prev); toBottom(true);
-    deliver(p);
+    if (p.up) { setAttach(null); startUpload(p); } else deliver(p);
     burst(); ctx = null; $("ctx-bar").hidden = true; input.value = ""; autosize(); input.focus();
   });
 
@@ -374,9 +466,8 @@
   function closeMenu() { menu.classList.remove("open"); document.querySelectorAll(".msg.picked").forEach(r => r.classList.remove("picked")); menuFor = null; }
   function openMenu(row, m) {
     closeMenu(); menuFor = m.id; row.classList.add("picked");
-    const mine = m.username === cfg.username;
-    menu.innerHTML = [["reply", "↩", "پاسخ"], ["copy", "⧉", "کپی"], ["forward", "➦", "فوروارد"]]
-      .concat(mine ? [["edit", "✎", "ویرایش"], ["delete", "✕", "حذف"]] : [])
+    const mine = m.username === cfg.username, canDel = mine || iAmAdmin(groups[m.group_id]);   // group owner / admins may delete anyone's message
+    menu.innerHTML = [["reply", "↩", "پاسخ"]].concat(m.text ? [["copy", "⧉", "کپی"]] : [], [["forward", "➦", "فوروارد"]], mine && m.text ? [["edit", "✎", "ویرایش"]] : [], canDel ? [["delete", "✕", "حذف"]] : [])
       .map(([a, i, l]) => `<button type="button" role="menuitem" data-act="${a}" class="${a === "delete" ? "del" : ""}"><i>${i}</i>${esc(t(l))}</button>`).join("");
     menu.classList.add("open");
     const r = row.querySelector(".bubble").getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
@@ -389,6 +480,8 @@
   feed.addEventListener("click", e => {
     const prof = e.target.closest("[data-profile]"); if (prof) return openUserProfile(prof.dataset.profile);
     const go = e.target.closest("[data-goto]"); if (go) return gotoMsg(go.dataset.goto);
+    const lb = e.target.closest("[data-lightbox]"); if (lb) { e.preventDefault(); return openLightbox(lb.dataset.lightbox); }
+    if (e.target.closest("video, audio, a.att-file")) return;      // let media controls / downloads work; a failed upload (div) still retries
     const bubble = e.target.closest(".bubble"); if (!bubble || String(getSelection())) return;
     const m = msgOf(bubble); if (!m) return;
     if (m.failed) return retry(m);
@@ -403,18 +496,20 @@
     if (m && !m.pending) { e.preventDefault(); openMenu(b.closest(".msg"), m); }
   });
   document.addEventListener("click", e => { if (menuFor && !e.target.closest(".bubble") && !e.target.closest("#msg-menu")) closeMenu(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeMenu(); document.querySelectorAll(".modal.show").forEach(m => m.classList.remove("show")); } });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeMenu(); document.querySelectorAll(".modal.show").forEach(m => m.classList.remove("show")); $("lightbox").hidden = true; } });
   menu.addEventListener("click", e => {
     const btn = e.target.closest("[data-act]"), m = msgs.find(x => x.id === menuFor); if (!btn || !m) return;
     closeMenu();
     ({reply: startReply, copy: copyMsg, forward: askForward, edit: startEdit, delete: askDelete})[btn.dataset.act](m);
   });
+  function openLightbox(url) { $("lightbox-img").src = url; $("lightbox").hidden = false; }
+  $("lightbox").addEventListener("click", () => { $("lightbox").hidden = true; $("lightbox-img").removeAttribute("src"); });
   function gotoMsg(id) {
     const row = feed.querySelector(`[data-id="${CSS.escape(id)}"]`);
     if (!row) return toast("پیام اصلی در بخش بارگذاری‌شده نیست.");
     row.scrollIntoView({block: "center", behavior: "smooth"}); row.classList.add("flash"); setTimeout(() => row.classList.remove("flash"), 1200);
   }
-  function startReply(m) { setCtx("reply", m.id, m.display_name || m.username, m.text); input.focus(); }
+  function startReply(m) { setCtx("reply", m.id, m.display_name || m.username, m.text || pv(previewOf(m))); input.focus(); }
   function startEdit(m) { setCtx("edit", m.id, "", m.text); input.value = m.text; autosize(); input.focus(); }
   async function copyMsg(m) {
     try { await navigator.clipboard.writeText(m.text); toast("کپی شد"); }
@@ -438,7 +533,7 @@
   document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => hideModal(b.dataset.close)));
   document.querySelectorAll(".modal").forEach(m => m.addEventListener("click", e => { if (e.target === m) m.classList.remove("show"); }));
   $("open-profile").addEventListener("click", () => showModal("profile-modal"));
-  $("open-group").addEventListener("click", () => showModal("group-modal"));
+  $("open-group").addEventListener("click", () => openGroupSettings());
   $("open-create-group").addEventListener("click", () => showModal("create-group-modal"));
   $("open-sidebar").addEventListener("click", () => $("sidebar").classList.add("open"));
   $("close-sidebar").addEventListener("click", () => $("sidebar").classList.remove("open"));
@@ -487,7 +582,7 @@
       const r = await fetch(`/api/group/${encodeURIComponent(activeGroup)}/invite`, {method: "POST"}), d = await r.json();
       if (!r.ok) throw new Error(d.error || "ساخت لینک ناموفق بود");
       $("group-invite-url").value = d.invite_url;
-      try { await navigator.clipboard.writeText(d.invite_url); toast("لینک دعوت کپی شد"); } catch (_) { showModal("group-modal"); }
+      try { await navigator.clipboard.writeText(d.invite_url); toast("لینک دعوت کپی شد"); } catch (_) { openGroupSettings(); }
     } catch (e) { toast(e.message); }
   });
   $("copy-invite").addEventListener("click", async () => {
@@ -521,6 +616,80 @@
   $("open-settings").addEventListener("click", () => { $("sidebar").classList.remove("open"); showModal("profile-modal"); });
   $("font-open").addEventListener("click", () => window.CRTheme.openFontPicker());
   $("theme-open").addEventListener("click", () => window.CRTheme.openPicker());
+  /* ---------- group management (owner / admins) ---------- */
+  async function apiPost(url, body) {
+    try {
+      const r = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, credentials: "same-origin", body: JSON.stringify(body || {})});
+      if (r.status === 401) return void (location.href = "/");
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "عملیات انجام نشد."); return null; }
+      return d;
+    } catch (_) { toast("اتصال به سرور برقرار نشد. اینترنتت را بررسی کن."); return null; }
+  }
+  async function groupApi(action, body, okMsg) {
+    const gid = activeGroup, d = await apiPost(`/api/group/${encodeURIComponent(gid)}/${action}`, body);
+    if (!d) return null;
+    if (d.group && groups[gid]) groups[gid] = Object.assign({}, groups[gid], d.group);
+    if (okMsg) toast(okMsg);
+    renderMembers(); renderGroupList(); updateHeader();
+    return d;
+  }
+  const confirmSheet = (title, label, fn) => sheet(title, null, [{label: "نه"}, {label, cls: "hot", fn}]);
+  function openMemberSheet(name) {
+    const g = groups[activeGroup]; if (!g) return;
+    const me = roleOf(g, cfg.username), they = roleOf(g, name), u = profileOf(name), shown = u.display_name || name, box = document.createElement("div");
+    const head = document.createElement("div"); head.className = "sheet-user"; head.setAttribute("data-no-i18n", "");
+    head.innerHTML = `<span class="avatar">${avatarHtml(u)}</span><span><strong>${esc(shown)}</strong><small>@${esc(name)}</small></span>`; box.appendChild(head);
+    const add = (label, fn, cls) => { const b = document.createElement("button"); b.type = "button"; b.className = "pick " + (cls || ""); b.textContent = t(label); b.onclick = () => { hideModal("sheet"); fn(); }; box.appendChild(b); };
+    add("مشاهده‌ی پروفایل", () => openUserProfile(name));
+    if (me === "owner" && they === "member") add("ارتقا به ادمین", () => groupApi("role", {username: name, role: "admin"}, "نقش تغییر کرد."));
+    if (me === "owner" && they === "admin") add("برگرداندن به عضو عادی", () => groupApi("role", {username: name, role: "member"}, "نقش تغییر کرد."));
+    if (me === "owner") add("انتقال مالکیت", () => confirmSheet(tf("مالکیت گروه به «{name}» منتقل شود؟", {name: shown}), "انتقال مالکیت", () => groupApi("transfer", {username: name}, "مالکیت منتقل شد.")));
+    if (they !== "owner" && (me === "owner" || (me === "admin" && they === "member"))) {
+      add("حذف از گروه", () => confirmSheet(tf("«{name}» از گروه حذف شود؟", {name: shown}), "حذف", () => groupApi("kick", {username: name, ban: false}, "از گروه حذف شد.")));
+      add("حذف و مسدود کردن", () => confirmSheet(tf("«{name}» از گروه حذف و مسدود شود؟", {name: shown}), "حذف", () => groupApi("kick", {username: name, ban: true}, "از گروه حذف شد.")), "del");
+    }
+    sheet("مدیریت عضو", box, [{label: "بستن"}]);
+  }
+  async function loadBanned() {
+    const gid = activeGroup;
+    try {
+      const r = await fetch(`/api/group/${encodeURIComponent(gid)}/members`, {credentials: "same-origin"}), d = await r.json();
+      if (!r.ok || gid !== activeGroup) return;
+      const list = $("banned-list"); list.innerHTML = "";
+      (d.banned || []).forEach(n => {
+        const row = document.createElement("div"); row.className = "ban-row";
+        row.innerHTML = `<span data-no-i18n>@${esc(n)}</span>`;
+        const b = document.createElement("button"); b.type = "button"; b.className = "key small"; b.textContent = t("رفع مسدودی");
+        b.onclick = async () => { if (await apiPost(`/api/group/${encodeURIComponent(gid)}/unban`, {username: n})) { row.remove(); toast("مسدودی برداشته شد."); $("banned-wrap").hidden = !list.children.length; } };
+        row.appendChild(b); list.appendChild(row);
+      });
+      $("banned-wrap").hidden = !(d.banned || []).length;
+    } catch (_) {}
+  }
+  function openGroupSettings() {
+    const g = groups[activeGroup]; if (!g || g.type === "dm") return;
+    const role = roleOf(g, cfg.username), admin = role === "owner" || role === "admin";
+    $("edit-group-name").readOnly = !admin; $("edit-group-description").readOnly = !admin;
+    $("save-group").hidden = !admin; $("reset-invite").hidden = !admin; $("delete-group").hidden = role !== "owner";
+    $("banned-wrap").hidden = true; $("group-status").textContent = "";
+    showModal("group-modal");
+    if (admin) loadBanned();
+  }
+  $("reset-invite").addEventListener("click", async () => {
+    const d = await apiPost(`/api/group/${encodeURIComponent(activeGroup)}/invite/reset`); if (!d) return;
+    $("group-invite-url").value = d.invite_url;
+    try { await navigator.clipboard.writeText(d.invite_url); } catch (_) {}
+    toast("لینک دعوت جدید ساخته شد");
+  });
+  $("leave-group").addEventListener("click", () => confirmSheet("از گروه خارج می‌شوی؟", "ترک گروه", async () => {
+    const gid = activeGroup, d = await apiPost(`/api/group/${encodeURIComponent(gid)}/leave`);
+    if (d) { hideModal("group-modal"); dropGroup(gid); toast("از گروه خارج شدی."); }
+  }));
+  $("delete-group").addEventListener("click", () => confirmSheet("گروه و همه‌ی پیام‌هایش برای همیشه حذف شود؟", "حذف گروه", async () => {
+    const gid = activeGroup, d = await apiPost(`/api/group/${encodeURIComponent(gid)}/delete`);
+    if (d) { hideModal("group-modal"); dropGroup(gid); toast("گروه حذف شد."); }
+  }));
   const langLink = $("open-lang");   // language picker, comes back to this page afterwards
   if (langLink) langLink.href = "/lang?next=" + encodeURIComponent(location.pathname + location.search);
 })();
