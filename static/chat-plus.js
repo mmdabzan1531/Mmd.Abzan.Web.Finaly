@@ -36,15 +36,15 @@
   addEventListener("resize", closePop);
 
   function dock(p) {
-    var c = ($(".composer") || emojiBtn).getBoundingClientRect(), w = Math.min(c.width, 480);
-    p.classList.add("dock"); p.style.width = w + "px"; p.style.left = Math.max(8, c.left + (c.width - w) / 2) + "px";
-    p.style.top = Math.max(8, c.top - p.offsetHeight - 8) + "px";
+    var c = ($(".composer") || emojiBtn).getBoundingClientRect(), w = Math.min(Math.max(c.width, 280), 520);
+    p.classList.add("dock"); p.style.width = w + "px"; p.style.left = Math.max(0, c.left + (c.width - w) / 2) + "px";
+    p.style.top = "auto"; p.style.bottom = Math.max(0, innerHeight - c.top + 6) + "px";
   }
   function emojiPicker(onPick, keepOpen) {
     var el = document.createElement("div"); el.className = "pp-pop ep"; el.dir = "ltr";
     var tabs = document.createElement("div"); tabs.className = "ep-tabs";
     var grid = document.createElement("div"); grid.className = "ep-grid";
-    el.appendChild(tabs); el.appendChild(grid);
+    el.appendChild(grid); el.appendChild(tabs);
     var all = [["🕘", null]].concat(CATS.map(function (c) { return [c[0], c[1].split(" ")]; }));
     function fill(i) {
       var list = i === 0 ? recents() : all[i][1];
@@ -174,16 +174,34 @@
       sendText("\u27e6contact\u27e7" + JSON.stringify({ name: name, phone: phone }));
     });
   }
-  var ATT = [["🖼", "عکس", "image/*", null], ["🎬", "ویدیو", "video/*", null], ["📷", "دوربین", "image/*", "environment"], ["🎵", "موزیک", "audio/*", null],
-    ["📁", "فایل", "", null], ["📍", "موقعیت مکانی", "@loc"], ["📊", "نظرسنجی", "@poll"], ["👤", "مخاطب", "@contact"]];
+  var ICON = {
+    image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+    video: '<rect x="2" y="6" width="14" height="12" rx="3"/><path d="M22 8l-6 4 6 4z"/>',
+    camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+    music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    pin: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+    poll: '<path d="M18 20V10M12 20V4M6 20v-6"/>',
+    user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+  };
+  var ATT = [["image", "عکس", "image/*", null, "#8e63f0"], ["video", "ویدیو", "video/*", null, "#f0556a"], ["camera", "دوربین", "image/*", "environment", "#ff8a3d"],
+    ["file", "فایل", "", null, "#3b8cf0"], ["music", "موزیک", "audio/*", null, "#ee5a9b"], ["pin", "موقعیت", "@loc", null, "#2cb67d"],
+    ["poll", "نظرسنجی", "@poll", null, "#e9a916"], ["user", "مخاطب", "@contact", null, "#20a9c4"]];
   document.addEventListener("click", function (e) {
     var b = e.target.closest && e.target.closest("#attach-btn");
     if (!b) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    if (openPop && openPop.classList.contains("am")) return closePop();
-    var m = document.createElement("div"); m.className = "pp-pop am";
+    if (openPop && openPop.classList.contains("pp-sheet-bg")) return closePop();
+    closePop();
+    var bg = document.createElement("div"); bg.className = "pp-sheet-bg";
+    var sh = document.createElement("div"); sh.className = "pp-sheet"; sh.dir = "rtl";
+    sh.appendChild(el("div", "pp-grab"));
+    var grid = el("div", "pp-attach-grid");
     ATT.forEach(function (a) {
-      var it = document.createElement("button"); it.type = "button"; it.innerHTML = "<i>" + a[0] + "</i><span>" + a[1] + "</span>";
+      var it = el("button", "pp-att"); it.type = "button";
+      var ic = el("span", "pp-att-ic"); ic.style.background = a[4];
+      ic.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + ICON[a[0]] + "</svg>";
+      it.appendChild(ic); it.appendChild(el("span", "pp-att-t", a[1]));
       it.onclick = function () {
         closePop();
         if (a[2] === "@loc") return sendLocation();
@@ -193,9 +211,11 @@
         if (a[3]) fileIn.setAttribute("capture", a[3]); else fileIn.removeAttribute("capture");
         fileIn.click();
       };
-      m.appendChild(it);
+      grid.appendChild(it);
     });
-    show(m, attachBtn, true);
+    sh.appendChild(grid); bg.appendChild(sh);
+    bg.addEventListener("pointerdown", function (ev) { if (ev.target === bg) closePop(); });
+    document.body.appendChild(bg); openPop = bg;
   }, true);
 
   /* ---------- واکنش به پیام‌ها ---------- */
@@ -297,9 +317,16 @@
     }).observe(feed, { childList: true, subtree: true });
     scan(feed);
   }
-  if (typeof io === "function") {
-    try { var s = io(); s.on("reaction_update", function (d) { if (d && d.id) { cache[d.id] = d.reactions || []; renderId(d.id); } }); } catch (e) {}
-  }
+  var ioTries = 0, sock = null;
+  (function waitIo() {
+    if (typeof io === "function") {
+      try {
+        sock = io();
+        sock.on("reaction_update", function (d) { if (d && d.id) { cache[d.id] = d.reactions || []; renderId(d.id); } });
+        sock.on("poll_update", function (d) { if (d && d.id && window.__ppSetVotes) window.__ppSetVotes(d.id, d.votes); });
+      } catch (e) {}
+    } else if (++ioTries < 60) setTimeout(waitIo, 500);
+  })();
   setInterval(function () {
     if (document.hidden) return;
     var ids = Object.keys(hosts).filter(function (id) { return (hosts[id] || []).some(function (h) { return h.isConnected; }); }).slice(-100);
@@ -394,7 +421,7 @@
     new MutationObserver(function (muts) { muts.forEach(function (m) { [].forEach.call(m.addedNodes, function (n) { if (n.nodeType === 3 || (n.nodeType === 1 && !n.closest(".pp-card"))) cards(n); }); }); })
       .observe(feed, { childList: true, subtree: true });
     cards(feed);
-    if (typeof io === "function") { try { io().on("poll_update", function (d) { if (d && d.id) setVotes(d.id, d.votes); }); } catch (e) {} }
+    window.__ppSetVotes = setVotes;
     setInterval(function () {
       if (document.hidden) return;
       var ids = Object.keys(pollCards).filter(function (id) { return pollCards[id].some(function (c) { return c.isConnected; }); }).slice(-100);
