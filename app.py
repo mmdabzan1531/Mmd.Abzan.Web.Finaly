@@ -295,6 +295,7 @@ def init_data():
         g.setdefault("admins", [])
         g.setdefault("banned", [])
         g.setdefault("avatar_url", "")
+        g.setdefault("background", "")
         if g["type"] != "dm" and g["owner"] in ("", "system") and g["members"]:
             g["owner"] = g["members"][0]          # old groups without an owner: the first member becomes owner
     write_json(GROUPS_FILE, groups)
@@ -595,7 +596,7 @@ def is_member(group, username):
 def public_group(g):
     return {"name": g.get("name", "گروه"), "description": g.get("description", ""), "members": g.get("members", []),
             "owner": g.get("owner", ""), "admins": g.get("admins", []), "type": g.get("type", "group"),
-            "avatar_url": g.get("avatar_url", "")}
+            "avatar_url": g.get("avatar_url", ""), "background": g.get("background", "")}
 
 
 def last_msg(gid):
@@ -1884,7 +1885,53 @@ def group_photo(group_id):
     return jsonify(ok=True, group=public_group(g))
 
 
-def _delete_group_data(group_id, avatar_url=""):
+BG_PRESET_RE = re.compile(r"^[a-z0-9_-]{1,24}$")
+
+
+@app.route("/api/group/<group_id>/background", methods=["POST"])
+@api_login
+def group_background(group_id):
+    """مالک/ادمین: تغییر پس‌زمینه‌ی چت گروه برای همه‌ی اعضا.
+    multipart/form: photo (فایل) | preset=<id> | remove=1"""
+    me = session["username"]
+    photo = request.files.get("photo")
+    preset = str(request.form.get("preset", "")).strip().lower()
+    remove = request.form.get("remove") == "1"
+    old = ""
+    with data_lock:
+        groups = read_json(GROUPS_FILE, {})
+        g = groups.get(group_id)
+        if not g or g.get("type") == "dm" or not is_admin(g, me):
+            return _err("فقط مالک یا ادمین می‌تواند پس‌زمینه‌ی گروه را تغییر دهد.", 403)
+        old = g.get("background", "")
+        if remove:
+            g["background"] = ""
+        elif preset:
+            if not BG_PRESET_RE.fullmatch(preset):
+                return _err("پس‌زمینه نامعتبر است.")
+            g["background"] = "p:" + preset
+        elif photo and photo.filename:
+            ext = os.path.splitext(secure_filename(photo.filename))[1].lower()
+            if ext not in ALLOWED_IMAGE_EXTENSIONS:
+                return _err("فرمت عکس پشتیبانی نمی‌شود.")
+            data = photo.read(MAX_IMAGE_SIZE + 1)
+            if len(data) > MAX_IMAGE_SIZE:
+                return _err("حجم عکس باید کمتر از ۴ مگابایت باشد.")
+            if not data or not looks_like_image(data[:16]):
+                return _err("فایل تصویر معتبر نیست.")
+            name = uuid.uuid4().hex + ext
+            store_media(name, IMAGE_MIME[ext], data)
+            g["background"] = "/media/" + name
+        else:
+            return _err("پس‌زمینه‌ای انتخاب نشده است.")
+        write_json(GROUPS_FILE, groups)
+    if old and old != g.get("background", ""):
+        remove_media_url(old)
+    _group_updated(group_id, g)
+    return jsonify(ok=True, group=public_group(g))
+
+
+def _delete_group_data(group_id, avatar_url="", background=""):
     names = [a.get("file") for a in (_parse_attach(r["attach"]) for r in
              q("SELECT attach FROM messages WHERE group_id=? AND attach<>''", (group_id,))) if a]
     q("DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE group_id=?)", (group_id,), commit=True)
@@ -1892,6 +1939,7 @@ def _delete_group_data(group_id, avatar_url=""):
     q("DELETE FROM messages WHERE group_id=?", (group_id,), commit=True)
     cleanup_media(names)
     remove_media_url(avatar_url)
+    remove_media_url(background)
 
 
 @app.route("/api/group/<group_id>/leave", methods=["POST"])
@@ -1908,7 +1956,7 @@ def group_leave(group_id):
         if len(g["members"]) <= 1:               # آخرین نفر: گروه پاک می‌شود
             groups.pop(group_id, None)
             write_json(GROUPS_FILE, groups)
-            _delete_group_data(group_id, g.get("avatar_url", ""))
+            _delete_group_data(group_id, g.get("avatar_url", ""), g.get("background", ""))
             _kick_sids(me, group_id)
             _refresh_user(me)
             return jsonify(ok=True, deleted=True)
@@ -1935,7 +1983,7 @@ def group_delete(group_id):
         members = list(g["members"])
         groups.pop(group_id)
         write_json(GROUPS_FILE, groups)
-        _delete_group_data(group_id, g.get("avatar_url", ""))
+        _delete_group_data(group_id, g.get("avatar_url", ""), g.get("background", ""))
     socketio.emit("group_deleted", {"id": group_id}, to=group_id)
     for n in members:
         _kick_sids(n, group_id)
@@ -1971,6 +2019,10 @@ def on_connect(auth=None):
         return False
     online_sids[request.sid] = username
     join_room("user:" + username)
+    try:
+        onboard_bot_chat(username)          # هر حساب (حتی قدیمی) چت خصوصی با دستیار را دارد
+    except Exception as e:
+        print("[bot] onboarding failed:", repr(e))
     groups = my_groups(username)
     for gid in groups:
         join_room(gid)
@@ -2241,56 +2293,4 @@ def api_poll_vote():
         return _err("کمی آهسته‌تر.", 429)
     cur = q("SELECT opt FROM poll_votes WHERE message_id=? AND username=?", (mid, username), one=True)
     if cur and cur["opt"] == opt:
-        q("DELETE FROM poll_votes WHERE message_id=? AND username=?", (mid, username), commit=True)
-    else:
-        q("INSERT INTO poll_votes(message_id,username,opt) VALUES(?,?,?) "
-          "ON CONFLICT(message_id,username) DO UPDATE SET opt=excluded.opt", (mid, username, opt), commit=True)
-    votes = poll_votes_for([mid])[mid]
-    socketio.emit("poll_update", {"id": mid, "group_id": row["group_id"], "votes": votes}, to=row["group_id"])
-    return jsonify(ok=True, id=mid, votes=votes)
-
-
-@socketio.on("typing")
-def on_typing(data):
-    username = session.get("username")
-    data = data or {}
-    gid = str(data.get("group_id", ""))
-    if username and valid_group(username, gid):
-        emit("typing", {"group_id": gid, "username": username, "typing": bool(data.get("typing", True))},
-             to=gid, include_self=False)
-
-
-@socketio.on("edit_message")
-def on_edit_message(data):
-    username = session.get("username")
-    data = data or {}
-    mid = str(data.get("id", ""))
-    text = str(data.get("text", "")).strip()[:1000]
-    if not username or not text or text[:1] == "\u27e6":
-        return
-    row, _ = fetch_one(mid)
-    if not row or row["username"] != username or not valid_group(username, row["group_id"]):
-        emit("action_error", {"error": "فقط می‌توانی پیام خودت را ویرایش کنی."})
-        return
-    q("UPDATE messages SET text=?, edited=1 WHERE id=?", (text, mid), commit=True)
-    emit("message_updated", fetch_one(mid)[1], to=row["group_id"])
-
-
-@socketio.on("delete_message")
-def on_delete_message(data):
-    username = session.get("username")
-    mid = str((data or {}).get("id", ""))
-    if not username:
-        return
-    row, _ = fetch_one(mid)
-    g = valid_group(username, row["group_id"]) if row else None
-    # صاحب پیام، یا مالک/ادمین گروه می‌تواند پیام را پاک کند
-    if not row or not g or (row["username"] != username and not is_admin(g, username)):
-        emit("action_error", {"error": "اجازه حذف این پیام را نداری."})
-        return
-    a = _parse_attach(_raw_attach(row))
-    q("DELETE FROM messages WHERE id=?", (mid,), commit=True)
-    q("DELETE FROM reactions WHERE message_id=?", (mid,), commit=True)
-    q("DELETE FROM poll_votes WHERE message_id=?", (mid,), commit=True)
-    if a:
-        cleanup_media([a
+        q(
