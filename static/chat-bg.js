@@ -221,31 +221,43 @@
   /* ================= دکمه‌ها داخل تنظیمات ================= */
   function amAdmin(g) { return !!g && g.type !== "dm" && (g.owner === ME || (g.admins || []).indexOf(ME) > -1); }
 
+  function bind(btn, fn) { if (btn && !btn.__cb) { btn.__cb = 1; btn.addEventListener("click", fn); } }
+
+  function openGroupPicker() {
+    var gid = guessGid(), g = groups[gid];
+    if (!gid || !g) { toast("اول وارد همان گروه شو، بعد دوباره امتحان کن."); return; }
+    if (g.type === "dm") { toast("پس‌زمینه‌ی گفتگوی خصوصی را از «تنظیمات ← پس‌زمینه چت» عوض کن."); return; }
+    if (!amAdmin(g)) { toast("فقط مالک یا ادمین گروه می‌تواند پس‌زمینه‌ی گروه را عوض کند."); return; }
+    openPicker("group", gid);
+  }
+
   function injectButtons() {
-    // ۱) تنظیمات شخصی: کنار «تم‌ها / فونت‌ها»
+    // ۱) تنظیمات شخصی: کنار «تم‌ها / فونت‌ها» (اگر در chat.html نبود ساخته می‌شود)
     var themeBtn = $("#theme-open");
     if (themeBtn && !$("#cb-open-me")) {
       var b = document.createElement("button"); b.type = "button"; b.id = "cb-open-me"; b.className = themeBtn.className; b.textContent = "🖼 پس‌زمینه چت";
-      b.onclick = function () { openPicker("me"); };
       themeBtn.parentNode.appendChild(b);
     }
-    // ۲) تنظیمات گروه: فقط مالک/ادمین
+    bind($("#cb-open-me"), function () { openPicker("me"); });
+    // ۲) تنظیمات گروه
     var gm = $("#group-modal .group-extra") || $("#group-modal .actions");
     if (gm && !$("#cb-open-group")) {
-      var gb = document.createElement("button"); gb.type = "button"; gb.id = "cb-open-group"; gb.className = "key small"; gb.textContent = "🖼 پس‌زمینه گروه"; gb.hidden = true;
-      gb.onclick = function () { openPicker("group", guessGid()); };
-      if (gm.classList.contains("group-extra")) gm.insertBefore(gb, gm.firstChild);
-      else gm.parentNode.insertBefore(gb, gm);
+      var gb = document.createElement("button"); gb.type = "button"; gb.id = "cb-open-group"; gb.className = "key small"; gb.textContent = "🖼 پس‌زمینه گروه";
+      if (gm.classList.contains("group-extra")) gm.insertBefore(gb, gm.firstChild); else gm.parentNode.insertBefore(gb, gm);
     }
+    bind($("#cb-open-group"), openGroupPicker);
   }
   function refreshGroupBtn() {
     var gb = $("#cb-open-group"); if (!gb) return;
-    var g = groups[guessGid()]; gb.hidden = !amAdmin(g);
+    var g = groups[guessGid()]; gb.hidden = !!(g && g.type === "dm");   // فقط در گفتگوی خصوصی پنهان است
   }
 
   document.addEventListener("click", function (e) {
     var t = e.target.closest && e.target.closest("#open-group,#open-profile,#open-settings,[data-open-settings]");
     if (t) setTimeout(function () { injectButtons(); refreshGroupBtn(); }, 30);
+    // روی موبایل: لمس عنوان/عکس بالای گروه، تنظیمات گروه را باز می‌کند (مثل تلگرام)
+    var hd = e.target.closest && e.target.closest("#room-title,#head-avatar");
+    if (hd) { var g = groups[guessGid()], ob = $("#open-group"); if (g && g.type !== "dm" && ob) { setTimeout(function () { ob.click(); }, 0); } }
   }, true);
 
   /* ================= دریافت اطلاعات گروه از سوکت (بدون دست زدن به chat.js) ================= */
