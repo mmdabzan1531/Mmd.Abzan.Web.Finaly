@@ -1,16 +1,17 @@
-/* chat-bg.js — پس‌زمینه‌ی چت
- *  • تنظیمات ← «پس‌زمینه چت»      : فقط برای خود شخص (ذخیره در مرورگر)
- *  • تنظیمات گروه ← «پس‌زمینه گروه»: برای همه‌ی اعضا (فقط مالک/ادمین) — نیاز به endpoint /api/group/<id>/background
- * اولویت نمایش: انتخاب شخصی ← پس‌زمینه‌ی گروه ← پیش‌فرض
- * این فایل باید قبل از اسکریپت بارگذاری socket.io در chat.html قرار بگیرد.
+/* chat-bg.js — پس‌زمینه‌ی چت (نسخه‌ی ۲)
+ *  • «پس‌زمینه من»  : برای خودِ شخص، روی همه‌ی گفتگوهایش؛ با حساب کاربری روی سرور ذخیره می‌شود (/api/me/background)
+ *  • «پس‌زمینه گروه»: فقط مالک/ادمین؛ برای همه‌ی اعضا و فقط داخل همان گروه (/api/group/<id>/background)
+ * اولویت داخل یک گروه: پس‌زمینه‌ی گروه (اگر ست شده) ← پس‌زمینه‌ی شخصی ← پیش‌فرض.   خارج از آن: شخصی ← پیش‌فرض.
+ * اگر می‌خواهی پس‌زمینه‌ی شخصی همیشه برنده باشد، GROUP_WINS را false کن.
  */
 (function () {
   "use strict";
-
-  var KEY = "cr_chat_bg_v1";
-  var CR = window.CHATROOM || {};
-  var ME = CR.username || "";
+  var GROUP_WINS = true;
+  var CR = window.CHATROOM || {}, ME = CR.username || "";
+  var KEY = "cr_chat_bg_v2:" + ME;
   function $(s, r) { return (r || document).querySelector(s); }
+  function C() { return window.CRChat || null; }
+  function G() { return (C() && C().groups) || {}; }
 
   /* ================= پیش‌فرض‌ها (بدون نیاز به عکس خارجی) ================= */
   function pat(op) {
@@ -39,32 +40,22 @@
   function presetById(id) { for (var i = 0; i < PRESETS.length; i++) if (PRESETS[i].id === id) return PRESETS[i]; return null; }
 
   /* ================= وضعیت ================= */
-  var groups = {}, curGid = CR.initialGroup || "", previewOn = false, preview = null;
-  (function seed() {
-    var ig = CR.initialGroups || {};
-    try {
-      if (Array.isArray(ig)) ig.forEach(function (g) { if (g && g.id) groups[g.id] = g; });
-      else Object.keys(ig).forEach(function (k) { groups[k] = ig[k]; });
-    } catch (e) {}
-  })();
-
-  function loadMine() { try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); return v && v.t ? v : null; } catch (e) { return null; } }
-  function saveMine(v) {
-    try { if (v) localStorage.setItem(KEY, JSON.stringify(v)); else localStorage.removeItem(KEY); return true; }
-    catch (e) { toast("فضای مرورگر پر است؛ عکس کوچک‌تری انتخاب کن."); return false; }
-  }
-  function groupSpec(g) {
-    var b = g && g.background; if (!b) return null;
+  var previewOn = false, preview = null, mineSpec = null;
+  function specFrom(b) {
+    b = String(b || ""); if (!b) return null;
     if (b.indexOf("p:") === 0) return { t: "p", id: b.slice(2) };
     if (b.indexOf("/media/") === 0) return { t: "i", url: b };
     return null;
   }
-  function guessGid() {
-    if (curGid && groups[curGid]) return curGid;
-    var h = $("#group-name-head"), name = h ? h.textContent.replace(/\u00a0/g, " ").trim() : "";
-    if (!name) return curGid;
-    var hit = Object.keys(groups).filter(function (k) { return groups[k] && groups[k].type !== "dm" && groups[k].name === name; });
-    return hit.length === 1 ? hit[0] : curGid;
+  function loadLocal() { try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); return v && v.t ? v : null; } catch (e) { return null; } }
+  function saveLocal(v) { try { if (v) localStorage.setItem(KEY, JSON.stringify(v)); else localStorage.removeItem(KEY); } catch (e) {} }
+  mineSpec = loadLocal();
+  function groupSpec(g) { return g ? specFrom(g.background) : null; }
+  function activeGid() { return (C() && C().activeGroup) || CR.initialGroup || ""; }
+  function currentSpec() {
+    if (previewOn) return preview;
+    var g = G()[activeGid()], gs = (g && g.type !== "dm") ? groupSpec(g) : null;
+    return GROUP_WINS ? (gs || mineSpec) : (mineSpec || gs);
   }
 
   /* ================= اعمال روی چت ================= */
@@ -86,17 +77,18 @@
     st.setProperty("background-attachment", "scroll", "important");
     feed.setAttribute("data-cbg", spec.t);
   }
-  function currentSpec() {
-    if (previewOn) return preview;
-    return loadMine() || groupSpec(groups[guessGid()]);
+  var lastKey = "\u0000";
+  function apply() {
+    var f = document.getElementById("messages"); if (!f) return;
+    var s = currentSpec(), k = JSON.stringify(s) || "";
+    if (k === lastKey) return; lastKey = k; applyTo(f, s);
   }
-  function apply() { var f = document.getElementById("messages"); if (f) applyTo(f, currentSpec()); }
 
   /* ================= toast + استایل ================= */
   function toast(t) { var d = document.createElement("div"); d.className = "cb-toast"; d.textContent = t; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 2400); }
   var css = document.createElement("style");
   css.textContent =
-    ".cb-ov{position:fixed;inset:0;z-index:99990;background:rgba(5,4,12,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:cbF .18s ease}" +
+    ".cb-ov{position:fixed;inset:0;z-index:2147483300;background:rgba(5,4,12,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:cbF .18s ease}" +
     "@media(min-width:640px){.cb-ov{align-items:center}}" +
     ".cb-card{width:min(520px,100%);max-height:88vh;overflow:auto;background:linear-gradient(180deg,#1d1b2e,#14131f);color:#f2f0ff;border:1px solid rgba(190,175,255,.22);" +
       "border-radius:22px 22px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 50px rgba(0,0,0,.55);animation:cbUp .24s cubic-bezier(.2,.9,.3,1);direction:rtl;font-family:inherit}" +
@@ -114,7 +106,7 @@
     ".cb-btn{flex:1;min-width:110px;height:44px;border-radius:14px;border:1px solid rgba(190,175,255,.28);background:rgba(255,255,255,.07);color:#f2f0ff;font:inherit;font-weight:700;cursor:pointer}" +
     ".cb-btn:active{transform:scale(.96)}.cb-btn.hot{background:linear-gradient(135deg,#9a8bff,#5a44e8);border-color:transparent;box-shadow:0 6px 18px rgba(110,90,250,.4)}" +
     ".cb-btn[disabled]{opacity:.5;pointer-events:none}" +
-    ".cb-toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:99999;background:rgba(30,28,48,.96);color:#fff;padding:10px 18px;border-radius:999px;font-size:.88rem;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:cbF .2s}" +
+    ".cb-toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:2147483400;background:rgba(30,28,48,.96);color:#fff;padding:10px 18px;border-radius:999px;font-size:.88rem;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:cbF .2s}" +
     "#messages[data-cbg]{transition:background .35s}" +
     "@keyframes cbF{from{opacity:0}to{opacity:1}}@keyframes cbUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}";
   document.head.appendChild(css);
@@ -132,33 +124,61 @@
     im.src = u;
   }
 
+  /* ================= ذخیره‌ی پس‌زمینه‌ی شخصی روی سرور ================= */
+  function pushMine(spec, blob) {
+    var fd = new FormData();
+    if (!spec) fd.append("remove", "1");
+    else if (spec.t === "p") fd.append("preset", spec.id);
+    else if (blob) fd.append("photo", blob, "bg.jpg");
+    else return;
+    fetch("/api/me/background", { method: "POST", body: fd, credentials: "same-origin" })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        if (d && d.ok) { mineSpec = specFrom(d.background); saveLocal(mineSpec); apply(); }
+        else toast((d && d.error) || "روی سرور ذخیره نشد؛ فقط روی همین دستگاه ماند.");
+      }).catch(function () { toast("خطای اتصال؛ فقط روی همین دستگاه ماند."); });
+  }
+  function pullMine() {
+    fetch("/api/me/background", { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.ok) return;
+        var s = specFrom(d.background);
+        if (!s) {                       // مهاجرت یک‌باره‌ی انتخاب قدیمی (فقط روی مرورگر) به حساب کاربری
+          var lg = null; try { lg = JSON.parse(localStorage.getItem("cr_chat_bg_v1") || "null"); } catch (e) {}
+          try { localStorage.removeItem("cr_chat_bg_v1"); } catch (e) {}
+          if (lg && lg.t === "p") { mineSpec = lg; pushMine(lg); apply(); return; }
+        }
+        mineSpec = s; saveLocal(s); apply();
+      }).catch(function () {});
+  }
+
   /* ================= پنجره‌ی انتخاب ================= */
   function openPicker(mode, gid) {
     if (document.querySelector(".cb-ov")) return;
-    var isGroup = mode === "group", mine = loadMine(), g = groups[gid] || {};
-    var sel = isGroup ? groupSpec(g) : mine;          // انتخاب فعلی
+    var isGroup = mode === "group", g = G()[gid] || {};
+    var sel = isGroup ? groupSpec(g) : mineSpec;          // انتخاب فعلی
     var draftBlob = null, uploadedUrl = null, dirty = false;
 
     var ov = document.createElement("div"); ov.className = "cb-ov";
     var card = document.createElement("div"); card.className = "cb-card"; ov.appendChild(card);
-    var h = document.createElement("h3"); h.textContent = isGroup ? "🖼 پس‌زمینه‌ی گروه" : "🖼 پس‌زمینه‌ی چت";
+    var h = document.createElement("h3"); h.textContent = isGroup ? "🖼 پس‌زمینه‌ی گروه" : "🖼 پس‌زمینه‌ی چت‌های من";
     var sub = document.createElement("p"); sub.className = "cb-sub";
-    sub.textContent = isGroup ? "برای همه‌ی اعضای این گروه عوض می‌شود. اعضایی که برای خودشان پس‌زمینه‌ی شخصی انتخاب کرده‌اند، همان را می‌بینند."
-                              : "فقط برای خودت عوض می‌شود و دیگران چیزی نمی‌بینند.";
+    sub.textContent = isGroup ? "فقط داخل همین گروه و برای همه‌ی اعضا عوض می‌شود. گروه‌های دیگر و گفتگوهای خصوصی تغییری نمی‌کنند."
+                              : "برای همه‌ی گفتگوهای خودت عوض می‌شود و دیگران چیزی نمی‌بینند. (گروهی که پس‌زمینه‌ی مخصوص خودش را دارد، همان را نشان می‌دهد.)";
     card.appendChild(h); card.appendChild(sub);
     var grid = document.createElement("div"); grid.className = "cb-grid"; card.appendChild(grid);
 
-    function same(a, b) { return !!a && !!b && a.t === b.t && (a.t === "p" ? a.id === b.id : a.url === b.url); }
     function mark() {
       [].forEach.call(grid.querySelectorAll(".cb-th[data-k]"), function (b) {
         var k = b.getAttribute("data-k"), on = !!sel && ((sel.t === "p" && k === sel.id) || (sel.t === "i" && k === "img"));
         b.classList.toggle("on", on);
       });
     }
-    function choose(spec) {
+    function choose(spec, blob) {
       sel = spec; dirty = true; mark();
       if (isGroup) { previewOn = true; preview = spec; apply(); }
-      else { if (saveMine(spec)) apply(); }
+      else { mineSpec = spec; saveLocal(spec.t === "p" ? spec : null); apply(); pushMine(spec, blob); }
     }
 
     PRESETS.forEach(function (p) {
@@ -175,8 +195,8 @@
     fi.onchange = function () {
       var f = fi.files && fi.files[0]; fi.value = ""; if (!f) return;
       shrink(f, function (blob, dataUrl) {
-        if (isGroup) { draftBlob = blob; uploadedUrl = URL.createObjectURL(blob); choose({ t: "i", url: uploadedUrl }); }
-        else choose({ t: "i", url: dataUrl });
+        if (isGroup) { draftBlob = blob; if (uploadedUrl) URL.revokeObjectURL(uploadedUrl); uploadedUrl = URL.createObjectURL(blob); choose({ t: "i", url: uploadedUrl }); }
+        else choose({ t: "i", url: dataUrl }, blob);
       });
     };
     grid.appendChild(up); card.appendChild(fi);
@@ -195,7 +215,7 @@
     ov.addEventListener("click", function (e) { if (e.target === ov) done(); });
 
     if (!isGroup) {
-      reset.onclick = function () { sel = null; saveMine(null); mark(); apply(); toast("پس‌زمینه‌ی پیش‌فرض برگشت."); };
+      reset.onclick = function () { sel = null; mineSpec = null; saveLocal(null); pushMine(null); mark(); apply(); toast("پس‌زمینه‌ی پیش‌فرض برگشت."); };
     } else {
       reset.onclick = function () { sel = null; dirty = true; draftBlob = null; mark(); previewOn = true; preview = null; apply(); };
       save.onclick = function () {
@@ -209,7 +229,7 @@
         fetch("/api/group/" + encodeURIComponent(gid) + "/background", { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) { return r.json().catch(function () { return {}; }); })
           .then(function (d) {
-            if (d && d.ok) { if (d.group) groups[gid] = d.group; toast("پس‌زمینه‌ی گروه برای همه تغییر کرد ✓"); done(); }
+            if (d && d.ok) { if (d.group && C()) C().groups[gid] = Object.assign({}, C().groups[gid], d.group); toast("پس‌زمینه‌ی گروه برای همه تغییر کرد ✓"); done(); }
             else { toast((d && d.error) || "ذخیره نشد."); save.disabled = false; save.textContent = "ذخیره برای همه"; }
           }).catch(function () { toast("خطای اتصال."); save.disabled = false; save.textContent = "ذخیره برای همه"; });
       };
@@ -218,76 +238,32 @@
     document.body.appendChild(ov);
   }
 
-  /* ================= دکمه‌ها داخل تنظیمات ================= */
   function amAdmin(g) { return !!g && g.type !== "dm" && (g.owner === ME || (g.admins || []).indexOf(ME) > -1); }
-
-  function bind(btn, fn) { if (btn && !btn.__cb) { btn.__cb = 1; btn.addEventListener("click", fn); } }
-
-  function openGroupPicker() {
-    var gid = guessGid(), g = groups[gid];
+  function openMe() { openPicker("me"); }
+  function openGroup() {
+    var gid = activeGid(), g = G()[gid];
     if (!gid || !g) { toast("اول وارد همان گروه شو، بعد دوباره امتحان کن."); return; }
-    if (g.type === "dm") { toast("پس‌زمینه‌ی گفتگوی خصوصی را از «تنظیمات ← پس‌زمینه چت» عوض کن."); return; }
+    if (g.type === "dm") { toast("پس‌زمینه‌ی گفتگوی خصوصی را از «پس‌زمینه‌ی چت‌های من» عوض کن."); return; }
     if (!amAdmin(g)) { toast("فقط مالک یا ادمین گروه می‌تواند پس‌زمینه‌ی گروه را عوض کند."); return; }
     openPicker("group", gid);
   }
+  window.CRBackground = { openMe: openMe, openGroup: openGroup };
 
+  /* دکمه‌های داخل تنظیمات (در chat.html آمده‌اند؛ اینجا فقط وصل می‌شوند) */
+  function bind(btn, fn) { if (btn && !btn.__cb) { btn.__cb = 1; btn.addEventListener("click", fn); } }
   function injectButtons() {
-    // ۱) تنظیمات شخصی: کنار «تم‌ها / فونت‌ها» (اگر در chat.html نبود ساخته می‌شود)
     var themeBtn = $("#theme-open");
     if (themeBtn && !$("#cb-open-me")) {
       var b = document.createElement("button"); b.type = "button"; b.id = "cb-open-me"; b.className = themeBtn.className; b.textContent = "🖼 پس‌زمینه چت";
       themeBtn.parentNode.appendChild(b);
     }
-    bind($("#cb-open-me"), function () { openPicker("me"); });
-    // ۲) تنظیمات گروه
-    var gm = $("#group-modal .group-extra") || $("#group-modal .actions");
-    if (gm && !$("#cb-open-group")) {
-      var gb = document.createElement("button"); gb.type = "button"; gb.id = "cb-open-group"; gb.className = "key small"; gb.textContent = "🖼 پس‌زمینه گروه";
-      if (gm.classList.contains("group-extra")) gm.insertBefore(gb, gm.firstChild); else gm.parentNode.insertBefore(gb, gm);
-    }
-    bind($("#cb-open-group"), openGroupPicker);
+    bind($("#cb-open-me"), openMe);
+    bind($("#cb-open-group"), openGroup);
   }
-  function refreshGroupBtn() {
-    var gb = $("#cb-open-group"); if (!gb) return;
-    var g = groups[guessGid()]; gb.hidden = !!(g && g.type === "dm");   // فقط در گفتگوی خصوصی پنهان است
-  }
-
-  document.addEventListener("click", function (e) {
-    var t = e.target.closest && e.target.closest("#open-group,#open-profile,#open-settings,[data-open-settings]");
-    if (t) setTimeout(function () { injectButtons(); refreshGroupBtn(); }, 30);
-    // روی موبایل: لمس عنوان/عکس بالای گروه، تنظیمات گروه را باز می‌کند (مثل تلگرام)
-    var hd = e.target.closest && e.target.closest("#room-title,#head-avatar");
-    if (hd) { var g = groups[guessGid()], ob = $("#open-group"); if (g && g.type !== "dm" && ob) { setTimeout(function () { ob.click(); }, 0); } }
-  }, true);
-
-  /* ================= دریافت اطلاعات گروه از سوکت (بدون دست زدن به chat.js) ================= */
-  function hookSocket(s) {
-    if (!s || s.__cbHooked || typeof s.on !== "function") return; s.__cbHooked = true;
-    s.on("group_history", function (d) { if (d && d.group_id) { curGid = d.group_id; if (d.group) groups[d.group_id] = d.group; apply(); refreshGroupBtn(); } });
-    s.on("group_updated", function (d) { if (d && d.id && d.group) { groups[d.id] = d.group; if (d.id === curGid || !curGid) apply(); refreshGroupBtn(); } });
-  }
-  function wrapIo(real) {
-    var w = function () { var s = real.apply(this, arguments); try { hookSocket(s); } catch (e) {} return s; };
-    try { for (var k in real) if (Object.prototype.hasOwnProperty.call(real, k)) w[k] = real[k]; } catch (e) {}
-    w.connect = w; w.__cbReal = real; return w;
-  }
-  try {
-    if (typeof window.io === "function") window.io = wrapIo(window.io);
-    else {
-      var held;
-      Object.defineProperty(window, "io", {
-        configurable: true, enumerable: true,
-        get: function () { return held; },
-        set: function (v) { held = (typeof v === "function" && !v.__cbReal) ? wrapIo(v) : v; }
-      });
-    }
-  } catch (e) {}
 
   /* ================= شروع ================= */
-  function init() {
-    injectButtons(); apply();
-    var last = JSON.stringify(currentSpec()) || "";
-    setInterval(function () { var k = JSON.stringify(currentSpec()) || ""; if (k !== last) { last = k; apply(); } }, 3000);
-  }
+  document.addEventListener("cr:group", apply);
+  addEventListener("cr:ready", function () { apply(); }, { once: true });
+  function init() { injectButtons(); apply(); pullMine(); setInterval(apply, 4000); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();
