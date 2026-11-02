@@ -245,6 +245,8 @@ def init_db():
             "ALTER TABLE messages ADD COLUMN IF NOT EXISTS attach TEXT DEFAULT ''",     # upgrade for existing databases
             "CREATE TABLE IF NOT EXISTS reactions(message_id TEXT NOT NULL, username TEXT NOT NULL, "
             "emoji TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(message_id, username))",
+            "CREATE TABLE IF NOT EXISTS poll_votes(message_id TEXT NOT NULL, username TEXT NOT NULL, "
+            "opt INTEGER NOT NULL, PRIMARY KEY(message_id, username))",
             "CREATE INDEX IF NOT EXISTS idx_group_seq ON messages(group_id, seq)"):
             pg_run(stmt, fetch=False)
         return
@@ -260,6 +262,8 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_group_seq ON messages(group_id, seq)")
         c.execute("CREATE TABLE IF NOT EXISTS reactions(message_id TEXT NOT NULL, username TEXT NOT NULL, "
                   "emoji TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(message_id, username))")
+        c.execute("CREATE TABLE IF NOT EXISTS poll_votes(message_id TEXT NOT NULL, username TEXT NOT NULL, "
+                  "opt INTEGER NOT NULL, PRIMARY KEY(message_id, username))")
         c.commit()
     old = os.path.join(DATA_DIR, "messages.json")  # one-time import of old history
     if os.path.exists(old) and q("SELECT COUNT(*) c FROM messages", one=True)["c"] == 0:
@@ -323,10 +327,67 @@ def _parse_attach(s):
         return None
 
 
+# ---------- special messages: location / contact / poll (sent as text with a marker) ----------
+SPECIAL_RE = re.compile(r"^\u27e6(loc|contact|poll)\u27e7(.*)$", re.S)
+
+
+def parse_special(text):
+    """-> (kind, clean_dict) or None when the text is not a valid special message."""
+    m = SPECIAL_RE.match(text or "")
+    if not m:
+        return None
+    try:
+        d = json.loads(m.group(2))
+    except ValueError:
+        return None
+    if not isinstance(d, dict):
+        return None
+    k = m.group(1)
+    try:
+        if k == "loc":
+            lat, lon = float(d["lat"]), float(d["lon"])
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                return None
+            return k, {"lat": round(lat, 6), "lon": round(lon, 6)}
+        if k == "contact":
+            name, phone = str(d.get("name", "")).strip()[:60], str(d.get("phone", "")).strip()[:30]
+            if not name or not re.fullmatch(r"[+\d\s()\-]{3,30}", phone):
+                return None
+            return k, {"name": name, "phone": phone}
+        if k == "poll":
+            qn = str(d.get("q", "")).strip()[:120]
+            opts = [str(o).strip()[:50] for o in (d.get("o") or []) if str(o).strip()][:6]
+            if not qn or len(opts) < 2:
+                return None
+            return k, {"q": qn, "o": opts}
+    except (KeyError, TypeError, ValueError):
+        return None
+    return None
+
+
+def normalize_special(text):
+    """Rebuilds a special message from validated data. -> (text, error)"""
+    if not SPECIAL_RE.match(text or ""):
+        return text, ""
+    p = parse_special(text)
+    if not p:
+        return None, "پیام ویژه نامعتبر است."
+    return "\u27e6" + p[0] + "\u27e7" + json.dumps(p[1], ensure_ascii=False, separators=(",", ":")), ""
+
+
+def special_label(text):
+    p = parse_special(text) if text and text[:1] == "\u27e6" else None
+    if not p:
+        return ""
+    k, d = p
+    return {"loc": "📍 موقعیت مکانی", "contact": "👤 مخاطب: " + d.get("name", "") if k == "contact" else "",
+            "poll": "📊 " + d.get("q", "") if k == "poll" else ""}[k][:60]
+
+
 def _preview(text, attach_raw):
     """Text shown in the chat list: the message, or a label for photos / files."""
     if text:
-        return text[:60]
+        return special_label(text) or text[:60]
     a = _parse_attach(attach_raw)
     if a:
         return {"image": "📷 عکس", "video": "🎞 ویدیو", "audio": "🎵 صوت"}.get(a.get("kind"), "📎 " + str(a.get("name", "فایل")))[:60]
@@ -409,7 +470,7 @@ def shape(r, users):
         "edited": bool(r["edited"]), "forwarded_from": r["forwarded_from"] or "",
         "attach": _parse_attach(_raw_attach(r)),
         "reply_to": r["reply_to"] or "",
-        "reply_text": ("📎 پیوست" if rt == "" else (rt or ""))[:120],
+        "reply_text": ("📎 پیوست" if rt == "" else (special_label(rt or "") or rt or ""))[:120],
         "reply_name": ru.get("display_name", r["reply_user"] or ""),
         "reply_gone": bool(r["reply_to"]) and rt is None,
     }
@@ -1827,6 +1888,7 @@ def _delete_group_data(group_id, avatar_url=""):
     names = [a.get("file") for a in (_parse_attach(r["attach"]) for r in
              q("SELECT attach FROM messages WHERE group_id=? AND attach<>''", (group_id,))) if a]
     q("DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE group_id=?)", (group_id,), commit=True)
+    q("DELETE FROM poll_votes WHERE message_id IN (SELECT id FROM messages WHERE group_id=?)", (group_id,), commit=True)
     q("DELETE FROM messages WHERE group_id=?", (group_id,), commit=True)
     cleanup_media(names)
     remove_media_url(avatar_url)
@@ -1971,6 +2033,10 @@ def deliver_message(username, gid, text, reply_to="", cid="", attach=None):
     g = valid_group(username, gid) if username else None
     if not g or (not text and not attach):
         return None, "ارسال پیام ممکن نیست."
+    if text:
+        text, serr = normalize_special(text)
+        if serr:
+            return None, serr
     hit = sent_cids.get((username, cid)) if cid else None
     if hit:
         return hit[0], ""
@@ -2129,6 +2195,59 @@ def api_react():
     return jsonify(ok=True, id=mid, reactions=data)
 
 
+# ---------- polls ----------
+def poll_votes_for(ids):
+    out = {i: [] for i in ids}
+    if ids:
+        for r in q("SELECT message_id, username, opt FROM poll_votes WHERE message_id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids)):
+            out[r["message_id"]].append([r["username"], r["opt"]])
+    return out
+
+
+@app.route("/api/polls")
+@api_login
+def api_polls():
+    username = session["username"]
+    ids = [i for i in request.args.get("ids", "").split(",") if MSG_ID_RE.fullmatch(i)][:200]
+    if not ids:
+        return jsonify(ok=True, polls={})
+    rows = q("SELECT id, group_id FROM messages WHERE id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids))
+    groups = read_json(GROUPS_FILE, {})
+    allowed = [r["id"] for r in rows if groups.get(r["group_id"]) and is_member(groups[r["group_id"]], username)]
+    return jsonify(ok=True, polls=poll_votes_for(allowed))
+
+
+@app.route("/api/poll/vote", methods=["POST"])
+@api_login
+def api_poll_vote():
+    """json: {id, option}. Voting for the same option again removes the vote."""
+    username = session["username"]
+    p = request.get_json(silent=True) or {}
+    mid = str(p.get("id", ""))
+    try:
+        opt = int(p.get("option"))
+    except (TypeError, ValueError):
+        return _err("گزینه نامعتبر است.")
+    row = q("SELECT group_id, text FROM messages WHERE id=?", (mid,), one=True) if MSG_ID_RE.fullmatch(mid) else None
+    g = valid_group(username, row["group_id"]) if row else None
+    sp = parse_special(row["text"]) if row else None
+    if not g or not sp or sp[0] != "poll":
+        return _err("نظرسنجی پیدا نشد.", 404)
+    if not 0 <= opt < len(sp[1]["o"]):
+        return _err("گزینه نامعتبر است.")
+    if not rate_ok("vote:" + username, 40, 10):
+        return _err("کمی آهسته‌تر.", 429)
+    cur = q("SELECT opt FROM poll_votes WHERE message_id=? AND username=?", (mid, username), one=True)
+    if cur and cur["opt"] == opt:
+        q("DELETE FROM poll_votes WHERE message_id=? AND username=?", (mid, username), commit=True)
+    else:
+        q("INSERT INTO poll_votes(message_id,username,opt) VALUES(?,?,?) "
+          "ON CONFLICT(message_id,username) DO UPDATE SET opt=excluded.opt", (mid, username, opt), commit=True)
+    votes = poll_votes_for([mid])[mid]
+    socketio.emit("poll_update", {"id": mid, "group_id": row["group_id"], "votes": votes}, to=row["group_id"])
+    return jsonify(ok=True, id=mid, votes=votes)
+
+
 @socketio.on("typing")
 def on_typing(data):
     username = session.get("username")
@@ -2145,7 +2264,7 @@ def on_edit_message(data):
     data = data or {}
     mid = str(data.get("id", ""))
     text = str(data.get("text", "")).strip()[:1000]
-    if not username or not text:
+    if not username or not text or text[:1] == "\u27e6":
         return
     row, _ = fetch_one(mid)
     if not row or row["username"] != username or not valid_group(username, row["group_id"]):
@@ -2170,52 +2289,11 @@ def on_delete_message(data):
     a = _parse_attach(_raw_attach(row))
     q("DELETE FROM messages WHERE id=?", (mid,), commit=True)
     q("DELETE FROM reactions WHERE message_id=?", (mid,), commit=True)
+    q("DELETE FROM poll_votes WHERE message_id=?", (mid,), commit=True)
     if a:
         cleanup_media([a.get("file")])
     emit("message_deleted", {"id": mid, "group_id": row["group_id"]}, to=row["group_id"])
 
 
 @socketio.on("forward_message")
-def on_forward_message(data):
-    username = session.get("username")
-    data = data or {}
-    mid = str(data.get("id", ""))
-    target = str(data.get("target_group", ""))
-    if not username or not valid_group(username, target):
-        emit("action_error", {"error": "گروه مقصد معتبر نیست یا عضو آن نیستی."})
-        return
-    row, shaped = fetch_one(mid)
-    if not row or not valid_group(username, row["group_id"]):
-        return
-    m = insert_message(target, username, row["text"], forwarded_from=shaped["display_name"], attach=_raw_attach(row))
-    emit("new_message", m, to=target)
-
-
-ensure_bot()
-for _n in list(read_json(USERS_FILE, {})):
-    onboard_bot_chat(_n)
-
-def _mail_selftest():
-    to = env("MAIL_SELFTEST_TO")
-    if to and email_ready():
-        print("[email] self-test ->", to, "OK" if send_email(to, "123456", "reset") else "FAILED (see errors above)")
-
-
-threading.Thread(target=_mail_selftest, daemon=True).start()
-startup_report()
-
-
-def lan_ip():
-    try:
-        with pysocket.socket(pysocket.AF_INET, pysocket.SOCK_DGRAM) as sk:
-            sk.connect(("10.255.255.255", 1))
-            return sk.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    print(f"\n  Chatroom is running\n  This device : http://127.0.0.1:{port}\n  Same Wi-Fi  : http://{lan_ip()}:{port}\n")
-    socketio.run(app, host=os.environ.get("HOST", "0.0.0.0"), port=port, debug=False,
-                 **({"allow_unsafe_werkzeug": True} if ASYNC_MODE == "threading" else {}))
+def o
