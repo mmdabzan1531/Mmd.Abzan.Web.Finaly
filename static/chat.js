@@ -37,6 +37,7 @@
 
   const profileOf = n => users[n] || {username: n, display_name: n, avatar: "🙂", bio: ""};
   const avatarHtml = u => u.avatar_url ? `<img src="${esc(u.avatar_url)}" alt="">` : esc(u.avatar || "🙂");
+  const groupAvatarHtml = g => g && g.avatar_url ? `<img src="${esc(g.avatar_url)}" alt="">` : esc([...((g && g.name) || t("گروه"))][0]);
   const fmtTime = iso => new Date(iso).toLocaleTimeString(LOC, {hour: "2-digit", minute: "2-digit"});
   const fmtDay = iso => new Date(iso).toLocaleDateString(LOC, {weekday: "long", day: "numeric", month: "long"});
   const dayKey = iso => new Date(iso).toDateString();
@@ -45,6 +46,27 @@
   /* roles: owner > admin > member (the server decides; this only shows / hides buttons) */
   const roleOf = (g, n) => !g ? null : g.type === "dm" ? "member" : g.owner === n ? "owner" : (g.admins || []).includes(n) ? "admin" : (g.members || []).includes(n) ? "member" : null;
   const iAmAdmin = g => ["owner", "admin"].includes(roleOf(g, cfg.username));
+
+  /* ---------- members drawer: closed by default, opened only by the "اعضا" button ---------- */
+  const peopleEl = $("people");
+  const drawerMode = () => getComputedStyle($("close-members")).display !== "none";   // the ✕ button only exists in the mobile drawer layout
+  let peopleTimer;
+  function setPeople(open) {
+    clearTimeout(peopleTimer);
+    if (open) {
+      peopleEl.style.visibility = ""; peopleEl.style.pointerEvents = "";
+      void peopleEl.offsetWidth;                                  // let the slide-in transition start from the closed position
+      peopleEl.classList.add("open"); return;
+    }
+    peopleEl.classList.remove("open");
+    if (drawerMode()) {
+      peopleEl.style.pointerEvents = "none";
+      peopleTimer = setTimeout(() => { if (!peopleEl.classList.contains("open")) peopleEl.style.visibility = "hidden"; }, 350);   // after the slide-out ends
+    } else { peopleEl.style.visibility = ""; peopleEl.style.pointerEvents = ""; }
+  }
+  setPeople(false);
+  if (drawerMode()) { peopleEl.style.visibility = "hidden"; peopleEl.style.pointerEvents = "none"; }
+  addEventListener("resize", () => setPeople(peopleEl.classList.contains("open")));
 
   /* attachments */
   const PV = ["📷 عکس", "🎞 ویدیو", "🎵 صوت"], pv = x => PV.includes(x) ? t(x) : x;     // translate only the built-in preview labels
@@ -185,7 +207,7 @@
       const preview = last ? who + pv(last.text) : (peer ? "@" + peer : (g.description || t("گفت‌وگوی گروهی")));
       const b = document.createElement("button");
       b.className = "group-item" + (id === activeGroup ? " active" : ""); b.dataset.groupId = id;
-      b.innerHTML = `<span class="avatar">${pu ? avatarHtml(pu) : esc([...(g.name || t("گروه"))][0])}${peer && online.has(peer) ? '<i class="on-dot"></i>' : ""}</span><span class="group-text" data-no-i18n><strong>${esc(titleOf(g))}</strong><small>${esc(preview)}</small></span><span class="group-meta">${last ? `<span>${fmtShort(last.created_at)}</span>` : ""}${n ? `<span class="badge">${n > 99 ? nf(99) + "+" : n.toLocaleString(LOC)}</span>` : ""}</span>`;
+      b.innerHTML = `<span class="avatar">${pu ? avatarHtml(pu) : groupAvatarHtml(g)}${peer && online.has(peer) ? '<i class="on-dot"></i>' : ""}</span><span class="group-text" data-no-i18n><strong>${esc(titleOf(g))}</strong><small>${esc(preview)}</small></span><span class="group-meta">${last ? `<span>${fmtShort(last.created_at)}</span>` : ""}${n ? `<span class="badge">${n > 99 ? nf(99) + "+" : n.toLocaleString(LOC)}</span>` : ""}</span>`;
       b.addEventListener("click", () => selectGroup(id));
       list.appendChild(b);
     });
@@ -221,7 +243,7 @@
     if (!g) { $("group-name-head").textContent = "Chatroom"; $("group-description").textContent = ""; $("head-avatar").innerHTML = ""; return; }
     $("group-name-head").textContent = titleOf(g);
     $("group-description").textContent = peer ? (online.has(peer) ? t("آنلاین") : "@" + peer) : (g.description || t("گفت‌وگوی گروهی"));
-    $("head-avatar").innerHTML = peer ? avatarHtml(profileOf(peer)) : esc([...(g.name || t("گروه"))][0]);
+    $("head-avatar").innerHTML = peer ? avatarHtml(profileOf(peer)) : groupAvatarHtml(g);
     $("edit-group-name").value = g.name || ""; $("edit-group-description").value = g.description || "";
   }
   function selectGroup(id) {
@@ -232,7 +254,7 @@
     feed.innerHTML = `<div class="empty"><p>${esc(t("در حال بارگذاری…"))}</p></div>`;
     updateHeader(); renderGroupList(); renderMembers();
     socket.emit("select_group", {group_id: id}); if (!live()) setTimeout(pollHttp, 50);
-    $("sidebar").classList.remove("open"); $("people").classList.remove("open");
+    $("sidebar").classList.remove("open"); setPeople(false);
   }
 
   /* ---------- socket events ---------- */
@@ -286,7 +308,7 @@
     if (activeGroup === id) {
       activeGroup = ""; msgs = []; hasMore = false; ctx = null; $("ctx-bar").hidden = true; closeMenu(); typers.clear(); renderTyping();
       try { localStorage.removeItem(LAST_KEY); } catch (_) {}
-      history.replaceState(null, "", location.pathname); $("sidebar").classList.add("open"); $("people").classList.remove("open");
+      history.replaceState(null, "", location.pathname); $("sidebar").classList.add("open"); setPeople(false);
     }
     renderAll(); updateHeader(); renderGroupList(); renderMembers(); updateTitle();
   }
@@ -496,7 +518,11 @@
     if (m && !m.pending) { e.preventDefault(); openMenu(b.closest(".msg"), m); }
   });
   document.addEventListener("click", e => { if (menuFor && !e.target.closest(".bubble") && !e.target.closest("#msg-menu")) closeMenu(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeMenu(); document.querySelectorAll(".modal.show").forEach(m => m.classList.remove("show")); $("lightbox").hidden = true; } });
+  /* tapping anywhere outside the members drawer closes it (mobile) */
+  document.addEventListener("click", e => {
+    if (peopleEl.classList.contains("open") && drawerMode() && !e.target.closest("#people") && !e.target.closest("#open-members") && !e.target.closest(".modal") && !e.target.closest("#msg-menu")) setPeople(false);
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeMenu(); setPeople(false); document.querySelectorAll(".modal.show").forEach(m => m.classList.remove("show")); $("lightbox").hidden = true; } });
   menu.addEventListener("click", e => {
     const btn = e.target.closest("[data-act]"), m = msgs.find(x => x.id === menuFor); if (!btn || !m) return;
     closeMenu();
@@ -522,7 +548,7 @@
     if (!others.length) box.textContent = t("برای فوروارد باید عضو گروه دیگری هم باشی.");
     others.forEach(([id, g]) => {
       const b = document.createElement("button"); b.type = "button"; b.className = "pick";
-      b.innerHTML = `<span class="group-tile">${esc([...(g.name || t("گروه"))][0])}</span><strong data-no-i18n>${esc(titleOf(g))}</strong>`;
+      b.innerHTML = `<span class="group-tile">${groupAvatarHtml(g)}</span><strong data-no-i18n>${esc(titleOf(g))}</strong>`;
       b.onclick = () => { hideModal("sheet"); if (!live()) return toast(LIVE_MSG); socket.emit("forward_message", {id: m.id, target_group: id}); toast("فوروارد شد"); };
       box.appendChild(b);
     });
@@ -537,8 +563,8 @@
   $("open-create-group").addEventListener("click", () => showModal("create-group-modal"));
   $("open-sidebar").addEventListener("click", () => $("sidebar").classList.add("open"));
   $("close-sidebar").addEventListener("click", () => $("sidebar").classList.remove("open"));
-  $("open-members").addEventListener("click", () => $("people").classList.add("open"));
-  $("close-members").addEventListener("click", () => $("people").classList.remove("open"));
+  $("open-members").addEventListener("click", () => setPeople(true));
+  $("close-members").addEventListener("click", () => setPeople(false));
 
   async function post(url, opts, statusEl, okText, modal) {
     statusEl.textContent = t("در حال ذخیره…");
@@ -577,17 +603,25 @@
       showModal("user-view-modal");
     } catch (_) { toast("پروفایل باز نشد."); }
   }
+  /* "لینک دعوت": only copies the link (never shown anywhere) */
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch (_) {
+      try {
+        const ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", "");
+        ta.style.cssText = "position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+        const ok = document.execCommand("copy"); ta.remove(); return ok;
+      } catch (__) { return false; }
+    }
+  }
   $("share-group").addEventListener("click", async () => {
     try {
-      const r = await fetch(`/api/group/${encodeURIComponent(activeGroup)}/invite`, {method: "POST"}), d = await r.json();
+      const r = await fetch(`/api/group/${encodeURIComponent(activeGroup)}/invite`, {method: "POST", credentials: "same-origin"}), d = await r.json();
       if (!r.ok) throw new Error(d.error || "ساخت لینک ناموفق بود");
-      $("group-invite-url").value = d.invite_url;
-      try { await navigator.clipboard.writeText(d.invite_url); toast("لینک دعوت کپی شد"); } catch (_) { openGroupSettings(); }
+      if (await copyText(d.invite_url)) toast("لینک دعوت کپی شد");
+      else if (navigator.share) navigator.share({url: d.invite_url}).catch(noop);
+      else toast("کپی انجام نشد؛ اجازه‌ی کلیپ‌بورد را بررسی کن.");
     } catch (e) { toast(e.message); }
-  });
-  $("copy-invite").addEventListener("click", async () => {
-    const el = $("group-invite-url"); if (!el.value) return;
-    try { await navigator.clipboard.writeText(el.value); toast("لینک کپی شد"); } catch (_) { el.select(); document.execCommand("copy"); }
   });
 
   updateHeader(); renderGroupList(); renderMembers(); renderAll();
@@ -611,7 +645,8 @@
       try { const d = await (await fetch("/api/users/search?q=" + encodeURIComponent(v))).json(); if (searchQ.trim().replace(/^@/, "") === v) { searchRes = d.users || []; renderGroupList(); } } catch (_) {}
     }, 250);
   });
-  const headClick = () => { const g = groups[activeGroup], p = dmPeer(g); if (p) openUserProfile(p); else if (g) $("people").classList.add("open"); };
+  /* tapping the header opens a DM partner's profile; the members list opens ONLY from the "اعضا" button */
+  const headClick = () => { const g = groups[activeGroup], p = dmPeer(g); if (p) openUserProfile(p); };
   $("room-title").addEventListener("click", headClick); $("head-avatar").addEventListener("click", headClick);
   $("open-settings").addEventListener("click", () => { $("sidebar").classList.remove("open"); showModal("profile-modal"); });
   $("font-open").addEventListener("click", () => window.CRTheme.openFontPicker());
@@ -672,15 +707,34 @@
     const role = roleOf(g, cfg.username), admin = role === "owner" || role === "admin";
     $("edit-group-name").readOnly = !admin; $("edit-group-description").readOnly = !admin;
     $("save-group").hidden = !admin; $("reset-invite").hidden = !admin; $("delete-group").hidden = role !== "owner";
+    $("group-photo-preview").innerHTML = groupAvatarHtml(g);
+    $("group-photo-wrap").hidden = !admin; $("group-photo").value = "";
+    $("group-photo-remove").hidden = !admin || !g.avatar_url;
     $("banned-wrap").hidden = true; $("group-status").textContent = "";
     showModal("group-modal");
     if (admin) loadBanned();
   }
+  async function sendGroupPhoto(fd) {
+    const gid = activeGroup, st = $("group-status"); st.textContent = t("در حال ذخیره…");
+    try {
+      const r = await fetch(`/api/group/${encodeURIComponent(gid)}/photo`, {method: "POST", body: fd, credentials: "same-origin"});
+      if (r.status === 401) return void (location.href = "/");
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { st.textContent = t(d.error || "عملیات انجام نشد."); return; }
+      groups[gid] = Object.assign({}, groups[gid], d.group);
+      if (gid === activeGroup) { $("group-photo-preview").innerHTML = groupAvatarHtml(groups[gid]); $("group-photo-remove").hidden = !groups[gid].avatar_url; }
+      updateHeader(); renderGroupList(); st.textContent = t("ذخیره شد.");
+    } catch (_) { st.textContent = t("اتصال به سرور برقرار نشد. اینترنتت را بررسی کن."); }
+  }
+  $("group-photo").addEventListener("change", e => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    if (f.size > 4 * 1048576) return void ($("group-status").textContent = t("حجم عکس باید کمتر از ۴ مگابایت باشد."));
+    const fd = new FormData(); fd.append("photo", f); sendGroupPhoto(fd);
+  });
+  $("group-photo-remove").addEventListener("click", () => { const fd = new FormData(); fd.append("remove", "1"); sendGroupPhoto(fd); });
   $("reset-invite").addEventListener("click", async () => {
     const d = await apiPost(`/api/group/${encodeURIComponent(activeGroup)}/invite/reset`); if (!d) return;
-    $("group-invite-url").value = d.invite_url;
-    try { await navigator.clipboard.writeText(d.invite_url); } catch (_) {}
-    toast("لینک دعوت جدید ساخته شد");
+    toast((await copyText(d.invite_url)) ? "لینک دعوت جدید ساخته و کپی شد" : "لینک دعوت جدید ساخته شد");
   });
   $("leave-group").addEventListener("click", () => confirmSheet("از گروه خارج می‌شوی؟", "ترک گروه", async () => {
     const gid = activeGroup, d = await apiPost(`/api/group/${encodeURIComponent(gid)}/leave`);
