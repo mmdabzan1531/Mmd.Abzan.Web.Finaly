@@ -7,20 +7,19 @@
     ".rx-row{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 2px;width:100%;flex:1 1 100%;justify-content:flex-start;position:static}" +
     ".rx-chip{padding:2px 9px;font-size:.95rem;background:rgba(255,255,255,.14);border-color:transparent}" +
     ".rx-chip.mine{background:rgba(155,140,255,.4);border-color:rgba(190,175,255,.8)}" +
-    /* ===== ری‌اکشن شیشه‌ای روی لبه‌ی پایین-راست حباب ===== */
-    ".rx-bubble{position:relative}" +
-    ".rx-bubble.has-rx{overflow:visible!important;margin-bottom:20px}" +
-    ".rx-bubble>.rx-row{position:absolute;bottom:-15px;right:12px;left:auto;top:auto;width:auto;flex:none;flex-wrap:nowrap;gap:5px;margin:0;z-index:3;direction:ltr}" +
-    ".rx-bubble>.rx-row .rx-chip{display:inline-flex;align-items:center;gap:5px;padding:2px 10px 2px 8px;border-radius:999px;color:#fff;line-height:1.5;" +
-      "background:linear-gradient(135deg,rgba(58,46,104,.97),rgba(20,18,36,.97));border:1px solid rgba(196,181,255,.42);" +
-      "box-shadow:0 5px 16px rgba(0,0,0,.5),0 0 14px rgba(139,123,255,.28),inset 0 1px 0 rgba(255,255,255,.16);" +
-      "-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);animation:rxIn .32s cubic-bezier(.2,1.5,.4,1);transition:transform .15s}" +
-    ".rx-bubble>.rx-row .rx-chip span{font-size:1.1rem;line-height:1}" +
-    ".rx-bubble>.rx-row .rx-chip b{font-size:.74rem;font-weight:700;opacity:.92}" +
-    ".rx-bubble>.rx-row .rx-chip.mine{background:linear-gradient(135deg,#9a8bff,#5a44e8);border-color:rgba(255,255,255,.6);" +
-      "box-shadow:0 5px 18px rgba(122,104,255,.6),0 0 0 2px rgba(155,140,255,.18),inset 0 1px 0 rgba(255,255,255,.4)}" +
-    ".rx-bubble>.rx-row .rx-chip:active{transform:scale(.88)}" +
-    "@keyframes rxIn{from{transform:translateY(8px) scale(.5);opacity:0}to{transform:none;opacity:1}}" +
+    /* ===== ری‌اکشن به سبک تلگرام: داخل حباب، بالای ردیف ساعت، سمت چپ ===== */
+    ".rx-bubble>.rx-row{position:static;display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 3px;width:auto;flex:none;direction:ltr;justify-content:flex-start}" +
+    ".rx-bubble>.rx-row .rx-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 8px;border:0;border-radius:999px;color:inherit;" +
+      "background:rgba(255,255,255,.17);font-size:.9rem;line-height:1;animation:rxIn .28s cubic-bezier(.2,1.5,.4,1);transition:transform .15s,background .2s}" +
+    ".rx-bubble>.rx-row .rx-chip.mine{background:linear-gradient(135deg,#9a8bff,#5a44e8);color:#fff;box-shadow:0 3px 12px rgba(110,90,250,.45)}" +
+    ".rx-bubble>.rx-row .rx-chip:active{transform:scale(.9)}" +
+    ".rx-chip .rx-e{font-size:1.15rem;line-height:1}" +
+    ".rx-chip .rx-n{font-weight:700;font-size:.8rem}" +
+    ".rx-avs{display:inline-flex;direction:ltr;align-items:center}" +
+    ".rx-av{width:20px;height:20px;border-radius:50%;margin-left:-7px;display:grid;place-items:center;overflow:hidden;font-size:.62rem;font-weight:700;line-height:1;color:#fff;" +
+      "background:linear-gradient(135deg,#6b5bd6,#3b2f8f);border:1.5px solid rgba(20,18,38,.85)}" +
+    ".rx-av:first-child{margin-left:0}.rx-av img{width:100%;height:100%;object-fit:cover;display:block}" +
+    "@keyframes rxIn{from{transform:scale(.55);opacity:0}to{transform:none;opacity:1}}" +
     ".rq{gap:2px;padding:6px 8px;border-radius:999px;background:rgba(30,30,42,.97);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);animation:ppIn .14s ease}" +
     ".rq button{font-size:1.7rem;padding:3px 4px;line-height:1;color:inherit}" +
     ".rq button.mine{background:rgba(155,140,255,.3);border-radius:50%}" +
@@ -301,7 +300,26 @@
     for (var i = 0; i < ms.length; i++) if (!ms[i].closest("[class*=avatar],.rx-row")) return ms[i].closest("a") || ms[i];
     return null;
   }
-  /* حباب واقعی پیام را پیدا می‌کند: از متن ساعت بالا می‌رود تا اولین المانی که پس‌زمینه دارد */
+  /* ---------- ظاهر چیپ: ایموجی + آواتار واکنش‌دهنده‌ها (تا ۳ نفر) یا تعداد ---------- */
+  function userInfo(name) {
+    var U = window.CHATROOM && window.CHATROOM.initialUsers, u = null;
+    try { if (Array.isArray(U)) { for (var i = 0; i < U.length; i++) if (U[i] && U[i].username === name) { u = U[i]; break; } } else if (U) u = U[name]; } catch (e) {}
+    return u || {};
+  }
+  function avatarEl(name) {
+    var u = userInfo(name), a = document.createElement("span"); a.className = "rx-av"; a.title = u.display_name || name;
+    if (u.avatar_url) { var im = document.createElement("img"); im.src = u.avatar_url; im.alt = ""; im.onerror = function () { im.remove(); a.textContent = (u.display_name || name || "?").charAt(0); }; a.appendChild(im); }
+    else a.textContent = (u.display_name || name || "?").charAt(0).toUpperCase();
+    return a;
+  }
+  function fillChip(c, r) {
+    var e = document.createElement("span"); e.className = "rx-e"; e.textContent = r.emoji; c.appendChild(e);
+    if (r.users.length <= 3) {
+      var w = document.createElement("span"); w.className = "rx-avs";
+      r.users.forEach(function (n) { w.appendChild(avatarEl(n)); }); c.appendChild(w);
+    } else { var n = document.createElement("b"); n.className = "rx-n"; n.textContent = r.users.length; c.appendChild(n); }
+  }
+  /* حباب واقعی پیام را از روی ساعت پیدا می‌کند و ردیفِ ساعت (فرزند مستقیم حباب) را هم برمی‌گرداند */
   function bgAlpha(cs) {
     if (cs.backgroundImage && cs.backgroundImage !== "none") return 1;
     var m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor || ""); if (!m) return 0;
@@ -309,11 +327,16 @@
   }
   function findBubble(h) {
     if (h.__rxb && h.contains(h.__rxb) && h.__rxb !== h) return h.__rxb;
-    var tre = /[0-9\u06f0-\u06f9]{1,2}:[0-9\u06f0-\u06f9]{2}/, w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT, null), n, el;
+    var tre = /[0-9\u06f0-\u06f9]{1,2}:[0-9\u06f0-\u06f9]{2}/, w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT, null), n, te, el;
     while ((n = w.nextNode())) {
       var v = n.nodeValue; if (!v || v.length > 14 || !tre.test(v)) continue;
-      el = n.parentElement; if (!el || el.closest(".rx-row")) continue;
-      while (el && el !== h) { if (bgAlpha(getComputedStyle(el)) > 0.05) return el; el = el.parentElement; }
+      te = n.parentElement; if (!te || te.closest(".rx-row")) continue;
+      for (el = te.parentElement; el && el !== h; el = el.parentElement) {
+        if (bgAlpha(getComputedStyle(el)) > 0.05) {
+          var t = te; while (t.parentElement && t.parentElement !== el) t = t.parentElement;
+          h.__rxt = t; return el;
+        }
+      }
     }
     return null;
   }
@@ -327,14 +350,22 @@
       list.forEach(function (r) {
         var mine = r.users.indexOf(ME) > -1, c = document.createElement("button");
         c.type = "button"; c.className = "rx-chip" + (mine ? " mine" : ""); c.title = r.users.join("، ");
-        c.innerHTML = "<span></span><b>" + r.users.length + "</b>"; c.firstChild.textContent = r.emoji;
+        fillChip(c, r);
         c.onclick = function (e) { e.stopPropagation(); react(id, r.emoji); };
         row.appendChild(c);
       });
     }
     var b = findBubble(h);
-    if (b) { if (row.parentNode !== b) b.appendChild(row); b.classList.add("rx-bubble", "has-rx"); h.__rxb = b; row.__anch = 1; }
-    else if (!row.isConnected || !h.contains(row)) { h.appendChild(row); row.__anch = 0; }
+    if (b) {
+      var t = h.__rxt;
+      if (t && t.parentNode === b) { if (row.parentNode !== b || row.nextSibling !== t) b.insertBefore(row, t); }
+      else if (row.parentNode !== b) b.appendChild(row);
+      b.classList.add("rx-bubble", "has-rx"); h.__rxb = b; row.__anch = 1;
+    } else if (!row.isConnected || !h.contains(row) || !row.__anch) {
+      var a = findAnchor(h, id);
+      if (a && a.parentNode) { a.parentNode.insertBefore(row, a.nextSibling); row.__anch = 1; }
+      else if (!row.isConnected || !h.contains(row)) { h.appendChild(row); row.__anch = 0; }
+    }
   }
   function ensureHost(el, id) {
     if (el.__rx === id) { render(el, id); return; }
