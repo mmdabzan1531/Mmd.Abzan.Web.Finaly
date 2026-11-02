@@ -243,6 +243,8 @@ def init_db():
             "group_id TEXT NOT NULL, username TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL, "
             "reply_to TEXT DEFAULT '', edited INTEGER DEFAULT 0, forwarded_from TEXT DEFAULT '', attach TEXT DEFAULT '')",
             "ALTER TABLE messages ADD COLUMN IF NOT EXISTS attach TEXT DEFAULT ''",     # upgrade for existing databases
+            "CREATE TABLE IF NOT EXISTS reactions(message_id TEXT NOT NULL, username TEXT NOT NULL, "
+            "emoji TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(message_id, username))",
             "CREATE INDEX IF NOT EXISTS idx_group_seq ON messages(group_id, seq)"):
             pg_run(stmt, fetch=False)
         return
@@ -256,6 +258,8 @@ def init_db():
         if "attach" not in [r[1] for r in c.execute("PRAGMA table_info(messages)")]:
             c.execute("ALTER TABLE messages ADD COLUMN attach TEXT DEFAULT ''")      # upgrade for existing databases
         c.execute("CREATE INDEX IF NOT EXISTS idx_group_seq ON messages(group_id, seq)")
+        c.execute("CREATE TABLE IF NOT EXISTS reactions(message_id TEXT NOT NULL, username TEXT NOT NULL, "
+                  "emoji TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(message_id, username))")
         c.commit()
     old = os.path.join(DATA_DIR, "messages.json")  # one-time import of old history
     if os.path.exists(old) and q("SELECT COUNT(*) c FROM messages", one=True)["c"] == 0:
@@ -1822,6 +1826,7 @@ def group_photo(group_id):
 def _delete_group_data(group_id, avatar_url=""):
     names = [a.get("file") for a in (_parse_attach(r["attach"]) for r in
              q("SELECT attach FROM messages WHERE group_id=? AND attach<>''", (group_id,))) if a]
+    q("DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE group_id=?)", (group_id,), commit=True)
     q("DELETE FROM messages WHERE group_id=?", (group_id,), commit=True)
     cleanup_media(names)
     remove_media_url(avatar_url)
@@ -2062,6 +2067,68 @@ def api_upload():
     return jsonify(ok=True, id=m["id"], message=m)
 
 
+# ---------- reactions (one reaction per person per message, like Telegram) ----------
+MSG_ID_RE = re.compile(r"[0-9a-f]{32}")
+
+
+def valid_emoji(e):
+    return 0 < len(e) <= 16 and all(ord(ch) > 0x7f for ch in e)
+
+
+def reactions_for(ids):
+    out = {i: [] for i in ids}
+    if not ids:
+        return out
+    rows = q("SELECT message_id, emoji, username FROM reactions WHERE message_id IN (" + ",".join("?" * len(ids))
+             + ") ORDER BY created_at", tuple(ids))
+    tmp = {}
+    for r in rows:
+        tmp.setdefault(r["message_id"], {}).setdefault(r["emoji"], []).append(r["username"])
+    for mid, per in tmp.items():
+        out[mid] = [{"emoji": em, "users": us} for em, us in sorted(per.items(), key=lambda kv: -len(kv[1]))]
+    return out
+
+
+@app.route("/api/reactions")
+@api_login
+def api_reactions():
+    username = session["username"]
+    ids = [i for i in request.args.get("ids", "").split(",") if MSG_ID_RE.fullmatch(i)][:200]
+    if not ids:
+        return jsonify(ok=True, reactions={})
+    rows = q("SELECT id, group_id FROM messages WHERE id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids))
+    groups = read_json(GROUPS_FILE, {})
+    allowed = [r["id"] for r in rows if groups.get(r["group_id"]) and is_member(groups[r["group_id"]], username)]
+    return jsonify(ok=True, reactions=reactions_for(allowed))
+
+
+@app.route("/api/react", methods=["POST"])
+@api_login
+def api_react():
+    """Toggle / change my reaction on a message. json: {id, emoji}. Same emoji again (or empty emoji) removes it."""
+    username = session["username"]
+    p = request.get_json(silent=True) or {}
+    mid, emoji = str(p.get("id", "")), str(p.get("emoji", "")).strip()
+    if not MSG_ID_RE.fullmatch(mid) or (emoji and not valid_emoji(emoji)):
+        return _err("واکنش نامعتبر است.")
+    row = q("SELECT group_id FROM messages WHERE id=?", (mid,), one=True)
+    g = valid_group(username, row["group_id"]) if row else None
+    if not g:
+        return _err("پیام پیدا نشد.", 404)
+    if not rate_ok("react:" + username, 40, 10):
+        return _err("کمی آهسته‌تر.", 429)
+    cur = q("SELECT emoji FROM reactions WHERE message_id=? AND username=?", (mid, username), one=True)
+    if not emoji or (cur and cur["emoji"] == emoji):
+        q("DELETE FROM reactions WHERE message_id=? AND username=?", (mid, username), commit=True)
+    else:
+        q("INSERT INTO reactions(message_id,username,emoji,created_at) VALUES(?,?,?,?) "
+          "ON CONFLICT(message_id,username) DO UPDATE SET emoji=excluded.emoji, created_at=excluded.created_at",
+          (mid, username, emoji, datetime.now(timezone.utc).isoformat()), commit=True)
+    data = reactions_for([mid])[mid]
+    socketio.emit("reaction_update", {"id": mid, "group_id": row["group_id"], "reactions": data}, to=row["group_id"])
+    return jsonify(ok=True, id=mid, reactions=data)
+
+
 @socketio.on("typing")
 def on_typing(data):
     username = session.get("username")
@@ -2102,6 +2169,7 @@ def on_delete_message(data):
         return
     a = _parse_attach(_raw_attach(row))
     q("DELETE FROM messages WHERE id=?", (mid,), commit=True)
+    q("DELETE FROM reactions WHERE message_id=?", (mid,), commit=True)
     if a:
         cleanup_media([a.get("file")])
     emit("message_deleted", {"id": mid, "group_id": row["group_id"]}, to=row["group_id"])
