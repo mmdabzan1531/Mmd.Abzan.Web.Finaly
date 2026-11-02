@@ -2162,10 +2162,12 @@ def api_reactions():
     ids = [i for i in request.args.get("ids", "").split(",") if MSG_ID_RE.fullmatch(i)][:200]
     if not ids:
         return jsonify(ok=True, reactions={})
-    rows = q("SELECT id, group_id FROM messages WHERE id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids))
+    rows = q("SELECT id, group_id, text FROM messages WHERE id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids))
     groups = read_json(GROUPS_FILE, {})
-    allowed = [r["id"] for r in rows if groups.get(r["group_id"]) and is_member(groups[r["group_id"]], username)]
-    return jsonify(ok=True, reactions=reactions_for(allowed))
+    rows = [r for r in rows if groups.get(r["group_id"]) and is_member(groups[r["group_id"]], username)]
+    allowed = [r["id"] for r in rows]
+    texts = {r["id"]: r["text"] for r in rows if r["text"] and not SPECIAL_RE.match(r["text"])}
+    return jsonify(ok=True, reactions=reactions_for(allowed), texts=texts)
 
 
 @app.route("/api/react", methods=["POST"])
@@ -2291,51 +2293,4 @@ def on_delete_message(data):
     q("DELETE FROM reactions WHERE message_id=?", (mid,), commit=True)
     q("DELETE FROM poll_votes WHERE message_id=?", (mid,), commit=True)
     if a:
-        cleanup_media([a.get("file")])
-    emit("message_deleted", {"id": mid, "group_id": row["group_id"]}, to=row["group_id"])
-
-
-@socketio.on("forward_message")
-def on_forward_message(data):
-    username = session.get("username")
-    data = data or {}
-    mid = str(data.get("id", ""))
-    target = str(data.get("target_group", ""))
-    if not username or not valid_group(username, target):
-        emit("action_error", {"error": "گروه مقصد معتبر نیست یا عضو آن نیستی."})
-        return
-    row, shaped = fetch_one(mid)
-    if not row or not valid_group(username, row["group_id"]):
-        return
-    m = insert_message(target, username, row["text"], forwarded_from=shaped["display_name"], attach=_raw_attach(row))
-    emit("new_message", m, to=target)
-
-
-ensure_bot()
-for _n in list(read_json(USERS_FILE, {})):
-    onboard_bot_chat(_n)
-
-def _mail_selftest():
-    to = env("MAIL_SELFTEST_TO")
-    if to and email_ready():
-        print("[email] self-test ->", to, "OK" if send_email(to, "123456", "reset") else "FAILED (see errors above)")
-
-
-threading.Thread(target=_mail_selftest, daemon=True).start()
-startup_report()
-
-
-def lan_ip():
-    try:
-        with pysocket.socket(pysocket.AF_INET, pysocket.SOCK_DGRAM) as sk:
-            sk.connect(("10.255.255.255", 1))
-            return sk.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    print(f"\n  Chatroom is running\n  This device : http://127.0.0.1:{port}\n  Same Wi-Fi  : http://{lan_ip()}:{port}\n")
-    socketio.run(app, host=os.environ.get("HOST", "0.0.0.0"), port=port, debug=False,
-                 **({"allow_unsafe_werkzeug": True} if ASYNC_MODE == "threading" else {}))
+        cleanup_media([a
