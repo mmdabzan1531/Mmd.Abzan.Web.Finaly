@@ -7,24 +7,24 @@
     <div class="side-head"><div class="brand"><svg class="mark"><use href="#star"/></svg><span>Chatroom</span></div><div class="side-tools"><button class="key small" data-install-btn hidden>نصب</button><button class="key round small hot" id="open-create-group" title="گروه جدید" aria-label="گروه جدید">+</button><button class="key round small mobile-only" id="close-sidebar" aria-label="بستن">✕</button></div></div>
     <div class="searchbox"><input id="chat-search" placeholder="جستجوی گفتگو یا نام کاربری…" autocomplete="off" aria-label="جستجو"></div>
     <nav id="group-list" class="group-list"></nav>
-    <div class="me" id="open-profile" role="button" tabindex="0"><div class="avatar" id="my-avatar">{% if current_user.avatar_url %}<img src="{{ current_user.avatar_url }}" alt="">{% else %}{{ current_user.avatar }}{% endif %}</div><div class="me-info"><strong id="my-display" data-no-i18n>{{ current_user.display_name }}</strong><span>@{{ current_user.username }}</span></div></div>
-    <div class="side-nav"><button type="button" id="open-settings"><i>⚙</i>تنظیمات</button><a href="/lang?next=/chat"><i>🌐</i>زبان</a><a href="/about#about"><i>ℹ</i>درباره ما</a><a href="/support#support"><i>🛟</i>پشتیبانی</a><a href="{{ url_for('logout') }}"><i>⎋</i>خروج</a></div>
+    <div class="me" id="open-profile" role="button" tabindex="0"><div class="avatar" id="my-avatar">{% if current_user.avatar_url %}<img src="{{ current_user.avatar_url }}" alt="">{% else %}{{ current_user.avatar }}{% endif %}</div><div class="me-info" data-no-i18n><strong id="my-display">{{ current_user.display_name }}</strong><span>@{{ current_user.username }}</span></div></div>
+    <div class="side-nav"><button type="button" id="open-settings"><i>⚙</i>تنظیمات</button><a href="/about#about"><i>ℹ</i>درباره ما</a><a href="/support#support"><i>🛟</i>پشتیبانی</a><a href="/lang" id="open-lang"><i>🌐</i>زبان</a><a href="{{ url_for('logout') }}"><i>⎋</i>خروج</a></div>
     <span id="online-count" hidden>0</span>
   </aside>
   <main class="room">
     <header class="room-head">
       <button class="key round small mobile-only" id="open-sidebar" aria-label="گفتگوها">☰</button>
       <div class="avatar" id="head-avatar"></div>
-      <div class="room-title" id="room-title"><h2 id="group-name-head">&nbsp;</h2><p id="group-description"></p></div>
+      <div class="room-title" id="room-title"><h2 id="group-name-head" data-no-i18n>&nbsp;</h2><p id="group-description" data-no-i18n></p></div>
       <button class="key small group-only" id="share-group">لینک دعوت</button><button class="key small group-only" id="open-group">تنظیمات</button><button class="key small members-toggle group-only" id="open-members">اعضا</button>
     </header>
     <div class="conn" id="conn" data-state="connecting" role="status">در حال اتصال…</div>
     <div class="feed" id="messages" aria-live="polite"></div>
     <button class="key round jump" id="jump" hidden aria-label="رفتن به آخرین پیام">↓<b id="jump-n" hidden></b></button>
     <div class="typing" id="typing" aria-live="polite"></div>
-    <div class="ctx" id="ctx-bar" hidden><div><b id="ctx-kind"></b><span id="ctx-text"></span></div><button type="button" class="key round small" id="cancel-ctx" aria-label="لغو">✕</button></div>
+    <div class="ctx" id="ctx-bar" hidden><div><b id="ctx-kind"></b><span id="ctx-text" data-no-i18n></span></div><button type="button" class="key round small" id="cancel-ctx" aria-label="لغو">✕</button></div>
     <form class="composer" id="message-form">
-      <textarea id="message-input" rows="1" maxlength="1000" placeholder="پیامت را بنویس…" aria-label="متن پیام"></textarea>
+      <textarea id="message-input" dir="auto" rows="1" maxlength="1000" placeholder="پیامت را بنویس…" aria-label="متن پیام"></textarea>
       <button class="key hot round send" type="submit" id="send-button" aria-label="ارسال">➤</button>
     </form>
   </main>
@@ -42,13 +42,13 @@
   <label>ایموجی (وقتی عکس نداری)</label><input id="profile-avatar" maxlength="12" value="{{ current_user.avatar }}">
   <label>نام نمایشی</label><input id="profile-name" maxlength="32" value="{{ current_user.display_name }}">
   <label>بیو</label><textarea id="profile-bio" maxlength="160" rows="3" placeholder="چند کلمه درباره خودت">{{ current_user.bio }}</textarea>
-  <label>شماره و ایمیل ثبت‌شده</label><div class="contact"><div><b>موبایل:</b><span dir="ltr">{{ current_user.phone or "—" }}</span></div><div><b>ایمیل:</b><span dir="ltr">{{ current_user.email or "—" }}</span></div></div>
+  <label>شماره و ایمیل ثبت‌شده</label><div class="contact"><div><b>موبایل:</b><span dir="ltr" data-no-i18n>{{ current_user.phone or "—" }}</span></div><div><b>ایمیل:</b><span dir="ltr" data-no-i18n>{{ current_user.email or "—" }}</span></div></div>
   <div class="row2"><input type="checkbox" id="profile-show-phone" {{ "checked" if current_user.show_phone }}><label for="profile-show-phone">نمایش شماره در پروفایل</label></div>
   <div class="row2"><input type="checkbox" id="profile-show-email" {{ "checked" if current_user.show_email }}><label for="profile-show-email">نمایش ایمیل در پروفایل</label></div>
-  <div class="row2"><button type="button" class="key small" id="theme-open">🎨 تم‌ها</button><button type="button" class="key small" id="font-open">🔤 فونت‌ها</button><a class="key small" href="/lang?next=/chat">🌐 زبان</a></div>
+  <div class="row2"><button type="button" class="key small" id="theme-open">🎨 تم‌ها</button><button type="button" class="key small" id="font-open">🔤 فونت‌ها</button></div>
   <div class="row2"><a class="key small" href="/support#support">🛟 پشتیبانی</a><a class="key small" href="/about#about">ℹ درباره ما</a></div>
   <div class="actions"><button class="key" data-close="profile-modal">بستن</button><button class="key hot" id="save-profile">ذخیره</button></div><p class="status" id="profile-status"></p></section></div>
-<div class="modal" id="user-view-modal"><section class="card center"><div class="avatar xl" id="view-user-avatar">🙂</div><h2 id="view-user-name"></h2><p class="handle" id="view-user-id"></p><p class="bio" id="view-user-bio"></p><div class="contact" id="view-contact"></div><div class="actions"><button class="key" data-close="user-view-modal">بستن</button><button class="key hot" id="view-dm">ارسال پیام</button></div></section></div>
+<div class="modal" id="user-view-modal"><section class="card center"><div class="avatar xl" id="view-user-avatar">🙂</div><h2 id="view-user-name" data-no-i18n></h2><p class="handle" id="view-user-id" data-no-i18n></p><p class="bio" id="view-user-bio" data-no-i18n></p><div class="contact" id="view-contact"></div><div class="actions"><button class="key" data-close="user-view-modal">بستن</button><button class="key hot" id="view-dm">ارسال پیام</button></div></section></div>
 <div class="modal" id="create-group-modal"><section class="card"><h2>گروه جدید</h2><label>نام گروه</label><input id="new-group-name" maxlength="40" placeholder="مثلاً گپ برنامه‌نویسی"><label>توضیحات</label><textarea id="new-group-description" maxlength="180" rows="3"></textarea><div class="actions"><button class="key" data-close="create-group-modal">بستن</button><button class="key hot" id="create-group-submit">ساخت گروه</button></div><p class="status" id="create-group-status"></p></section></div>
 <div class="modal" id="group-modal"><section class="card"><h2>تنظیمات گروه</h2><label>نام گروه</label><input id="edit-group-name" maxlength="40"><label>توضیحات</label><textarea id="edit-group-description" maxlength="180" rows="3"></textarea><label>لینک دعوت</label><div class="row"><input id="group-invite-url" readonly placeholder="روی «لینک دعوت» بزن"><button type="button" class="key" id="copy-invite">کپی</button></div><div class="actions"><button class="key" data-close="group-modal">بستن</button><button class="key hot" id="save-group">ذخیره</button></div><p class="status" id="group-status"></p></section></div>
 <div class="modal" id="sheet"><section class="card"><h2 id="sheet-title"></h2><div id="sheet-body"></div><div class="actions" id="sheet-actions"></div></section></div>
