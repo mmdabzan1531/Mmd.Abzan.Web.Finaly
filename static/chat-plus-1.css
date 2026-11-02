@@ -16,7 +16,7 @@
 .composer textarea{flex:1;min-width:0}
 
 /* ===== پنل ایموجی ===== */
-.pp-pop{position:fixed;z-index:90;background:var(--panel,var(--night,#14141c));color:inherit;border:1px solid rgba(255,255,255,.14);
+.pp-pop{position:fixed;z-index:2147483000;background:var(--panel,var(--night,#14141c));color:inherit;border:1px solid rgba(255,255,255,.14);
   border-radius:16px;box-shadow:0 10px 36px rgba(0,0,0,.5);animation:ppIn .14s ease}
 @keyframes ppIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
 .ep{width:min(340px,94vw);display:flex;flex-direction:column;overflow:hidden}
@@ -52,7 +52,7 @@
 .pp-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:999px;z-index:120;font-size:.9rem}
 
 /* ایموجی‌های آیفون (اندازه قفل‌شده تا هیچ استایل دیگری خرابش نکند) */
-img.ap-emoji{display:inline-block!important;width:1.2em!important;height:1.2em!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+img.ap-emoji{display:inline-block!important;width:min(1.2em,32px)!important;height:min(1.2em,32px)!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
   margin:0 .04em!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;
   vertical-align:-.2em!important;object-fit:contain!important;aspect-ratio:1/1;-webkit-user-drag:none;user-select:none;pointer-events:none;flex:none}
 .ep-grid button img.ap-emoji,.ep-tabs button img.ap-emoji{width:1.5rem!important;height:1.5rem!important;vertical-align:middle!important;margin:0!important}
@@ -97,3 +97,26 @@ img.ap-emoji{display:inline-block!important;width:1.2em!important;height:1.2em!i
 .pp-field input{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:inherit;font:inherit}
 .pp-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
 .pp-modal .pp-btn{margin-top:6px}.pp-actions .pp-btn{margin-top:0}
+
+/* ===== پنل ایموجی (سبک تلگرام) ===== */
+.ep.dock{display:flex;flex-direction:column;border-radius:18px 18px 14px 14px;background:var(--panel,var(--night,#15151d))}
+.ep.dock .ep-grid{height:min(290px,40vh);grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:0;padding:8px 6px}
+.ep.dock .ep-grid button{font-size:1.7rem;padding:7px 0;border-radius:12px}
+.ep.dock .ep-tabs{border-bottom:0;border-top:1px solid rgba(255,255,255,.1);justify-content:space-around;padding:4px 6px}
+.ep.dock .ep-tabs button{font-size:1.25rem;flex:1;opacity:.5}
+.ep.dock .ep-tabs button.on{opacity:1;background:rgba(155,140,255,.2)}
+
+/* ===== شیت پیوست (سبک تلگرام / بله) ===== */
+.pp-sheet-bg{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;animation:ppFade .18s ease}
+@keyframes ppFade{from{opacity:0}to{opacity:1}}
+@keyframes ppUp{from{transform:translateY(100%)}to{transform:none}}
+.pp-sheet{width:min(520px,100%);background:var(--panel,var(--night,#15151d));color:inherit;border-radius:22px 22px 0 0;padding:8px 14px calc(20px + env(safe-area-inset-bottom,0px));
+  box-shadow:0 -10px 40px rgba(0,0,0,.5);animation:ppUp .24s cubic-bezier(.2,.8,.2,1)}
+.pp-grab{width:42px;height:4px;border-radius:4px;background:rgba(255,255,255,.28);margin:4px auto 14px}
+.pp-attach-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 6px}
+.pp-att{display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:2px 0}
+.pp-att-ic{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .12s}
+.pp-att:active .pp-att-ic{transform:scale(.9)}
+.pp-att-ic svg{width:27px;height:27px}
+.pp-att-t{font-size:.8rem;opacity:.85}
+.pp-modal-bg{z-index:2147483100}
