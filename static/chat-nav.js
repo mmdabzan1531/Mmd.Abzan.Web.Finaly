@@ -65,7 +65,7 @@
 
     /* ---------- home page: on phones the chat list (with the bottom bar) is the first screen, like Telegram ---------- */
     const phone = () => window.matchMedia("(max-width:860px)").matches;
-    if (phone() && !/\/join\//.test(document.referrer || "")) side.classList.add("open");
+    if (phone() && !C.activeGroup) side.classList.add("open");
     const back = $("open-sidebar");
     if (back) back.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
 
