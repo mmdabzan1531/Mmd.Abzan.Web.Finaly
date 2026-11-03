@@ -585,6 +585,10 @@ def safe_user_public(u, full=False):
     d["show_phone"], d["show_email"] = bool(u.get("show_phone")), bool(u.get("show_email"))
     d["phone"] = u.get("phone", "") if (full or d["show_phone"]) else ""
     d["email"] = u.get("email", "") if (full or d["show_email"]) else ""
+    d["show_online"] = u.get("show_online", True) is not False
+    d["show_bio"] = u.get("show_bio", True) is not False
+    if not (full or d["show_bio"]):
+        d["bio"] = ""
     d["show_birthday"] = bool(u.get("show_birthday"))
     d["birthday"] = u.get("birthday", "") if (full or d["show_birthday"]) else ""
     return d
@@ -637,7 +641,9 @@ def my_groups(username):
 
 
 def online_names():
-    return sorted(set(online_sids.values()))
+    users = read_json(USERS_FILE, {})
+    hidden = {n for n in set(online_sids.values()) if (users.get(n) or {}).get("show_online", True) is False}
+    return sorted(set(online_sids.values()) - hidden)
 
 
 def broadcast_presence():
@@ -1738,6 +1744,26 @@ def _contacts_payload(users, me):
             out.append({"username": name, "name": str(custom or "")[:60], "user": safe_user_public(users[name])})
     out.sort(key=lambda c: (c["name"] or c["user"]["display_name"] or c["username"]).lower())
     return out
+
+
+@app.route("/api/privacy", methods=["POST"])
+@api_login
+def api_privacy():
+    d = request.get_json(silent=True) or {}
+    keys = ("show_online", "show_phone", "show_email", "show_bio", "show_birthday")
+    with data_lock:
+        users = read_json(USERS_FILE, {})
+        me = session["username"]
+        if me not in users:
+            return jsonify(error="کاربر پیدا نشد."), 404
+        for k in keys:
+            if k in d:
+                users[me][k] = bool(d[k])
+        write_json(USERS_FILE, users)
+        pub, full = safe_user_public(users[me]), safe_user_public(users[me], True)
+    socketio.emit("profile_updated", pub)
+    broadcast_presence()
+    return jsonify(ok=True, user=full)
 
 
 @app.route("/api/contacts", methods=["GET", "POST"])
