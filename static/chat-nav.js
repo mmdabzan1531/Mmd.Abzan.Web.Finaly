@@ -234,6 +234,7 @@
           item("#3a8ee6", ICON.user, t("حساب کاربری"), t("نام، بیو، عکس، تاریخ تولد"), () => C.showModal("profile-modal")),
           item("#e59a2e", ICON.chat, t("تنظیمات گفتگو"), t("تم، فونت، پس‌زمینه"), chatSettings),
           item("#3fae5a", ICON.lock, t("حریم خصوصی"), t("نمایش شماره، ایمیل و تاریخ تولد"), openPrivacy),
+          item("#f5b301", '<svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>', t("پریمیوم"), t("استوری ۴۸ و ۷۲ ساعته"), () => window.CRStories && window.CRStories.openPremium()),
           item("#8e5bd6", ICON.globe, t("زبان"), t("تغییر زبان برنامه"), () => { const a = $("open-lang"); a ? a.click() : (location.href = "/lang"); })
         ]],
         [t("راهنما"), [
@@ -276,7 +277,7 @@
     function renderProfile(u) {
       const field = (val, label, ltr) => val ? `<div class="p-field"><b${ltr ? ' dir="ltr" style="text-align:start"' : ""} data-no-i18n>${esc(val)}</b><small>${esc(label)}</small></div>` : "";
       $("p-body").innerHTML = `
-        <div class="p-hero"><div class="avatar" id="p-avatar">${C.avatarHtml(u)}</div><h2 data-no-i18n>${esc(u.display_name || u.username || "")}</h2><div class="p-status">${esc(t("آنلاین"))}</div></div>
+        <div class="p-hero"><div class="avatar" id="p-avatar">${C.avatarHtml(u)}</div><h2 data-no-i18n>${esc(u.display_name || u.username || "")}${u.premium ? '<span class="p-prem" title="Premium">⭐</span>' : ""}</h2><div class="p-status">${esc(t("آنلاین"))}</div></div>
         <div class="p-btns">
           <button type="button" data-p="photo">${ICON.camera}<span>${esc(t("تغییر عکس"))}</span></button>
           <button type="button" data-p="edit">${ICON.edit}<span>${esc(t("ویرایش اطلاعات"))}</span></button>
@@ -284,7 +285,8 @@
         </div>
         <div class="p-card">${field(u.phone, t("موبایل"), true)}${field(u.bio, t("بیو"))}${field(u.username ? "@" + u.username : "", t("نام کاربری"), true)}${field(birthText(u.birthday), t("تاریخ تولد"))}</div>
         <div class="p-tabs"><button type="button" data-pt="posts" class="${pTab === "posts" ? "on" : ""}">${esc(t("پست‌ها"))}</button><button type="button" data-pt="archived" class="${pTab === "archived" ? "on" : ""}">${esc(t("پست‌های بایگانی‌شده"))}</button></div>
-        <div class="nav-empty">${esc(pTab === "posts" ? t("هنوز پستی نداری.") : t("پست بایگانی‌شده‌ای نداری."))}</div>`;
+        <div id="p-posts"></div>`;
+      if (window.CRStories) window.CRStories.renderPosts($("p-posts"), pTab);
     }
     $("p-body").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
