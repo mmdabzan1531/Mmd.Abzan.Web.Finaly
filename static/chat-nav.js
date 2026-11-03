@@ -61,6 +61,70 @@
         <button type="button" data-tab="profile"><span class="nav-av" id="nav-av"></span><span>${esc(t("پروفایل"))}</span></button>
       </nav>`);
     side.dataset.tab = "chats";
+
+    /* ---------- Telegram-style top: status title, ⋮ menu, stories row ---------- */
+    (function topBar() {
+      const title = $("tg-title"), txt = $("tg-title-text"), conn = $("conn");
+      const BRAND = "Chatroom";
+      function syncTitle() {
+        const st = conn ? conn.dataset.state : "on";
+        title.dataset.state = st;
+        txt.textContent = st === "connecting" ? t("در حال اتصال…") : st === "off" ? t("در انتظار شبکه…") : BRAND;
+      }
+      if (conn) { new MutationObserver(syncTitle).observe(conn, {attributes: true, attributeFilter: ["data-state"]}); }
+      syncTitle();
+
+      /* ⋮ menu: every action proxies to the original (now hidden) controls, so old handlers keep working */
+      $("tg-more").addEventListener("click", () => {
+        const box = document.createElement("div"); box.className = "tg-menu";
+        const add = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "key"; b.textContent = label; b.onclick = () => { C.hideModal("sheet"); fn(); }; box.appendChild(b); };
+        add(t("گروه جدید"), () => { const b = $("open-create-group"); b && b.click(); });
+        const inst = document.querySelector("[data-install-btn]"); if (inst && !inst.hidden) add(t("نصب برنامه"), () => inst.click());
+        add(t("پس‌زمینه من"), () => { const b = $("open-my-background"); b && b.click(); });
+        [["#open-lang", "زبان"], ['.side-nav a[href*="about"]', "درباره ما"], ['.side-nav a[href*="support"]', "پشتیبانی"], ['.side-nav a[href*="logout"]', "خروج"]].forEach(([sel, label]) => {
+          const a = document.querySelector(sel); if (a) add(t(label), () => { location.href = a.getAttribute("href"); });
+        });
+        C.sheet("منو", box, [{label: "بستن"}]);
+      });
+
+      /* stories row */
+      const row = $("tg-stories"), me = (cfg && cfg.username) || (document.querySelector(".me-info span") || {}).textContent || "";
+      const myName = String(me).replace(/^@/, "");
+      const avatar = u => u && u.avatar_url ? '<img src="' + esc(u.avatar_url) + '" alt="">' : esc((u && u.avatar) || "🙂");
+      const openStory = (g) => {
+        const S = window.CRStories;
+        if (S && typeof S.open === "function") return S.open(g.user.username, g);
+        if (S && typeof S.openViewer === "function") return S.openViewer(g.user.username, g);
+        window.dispatchEvent(new CustomEvent("cr:story-open", {detail: {username: g.user.username, group: g}}));
+      };
+      const addStory = () => {
+        const S = window.CRStories;
+        if (S && typeof S.compose === "function") return S.compose();
+        if (S && typeof S.add === "function") return S.add();
+        window.dispatchEvent(new CustomEvent("cr:story-add"));
+      };
+      async function loadStories() {
+        let groups = [];
+        try { const r = await fetch("/api/stories", {credentials: "same-origin"}); const d = await r.json(); if (r.ok && d.ok) groups = d.groups || []; } catch (_) {}
+        const mine = groups.find(g => g.user.username === myName), others = groups.filter(g => g !== mine);
+        row.innerHTML = "";
+        const el = (cls, av, name, plus, fn) => {
+          const d = document.createElement("div"); d.className = "tg-st " + cls; d.setAttribute("role", "button"); d.tabIndex = 0;
+          d.innerHTML = '<span class="tg-ring"><span class="avatar">' + av + '</span>' + (plus ? '<i class="tg-plus">+</i>' : "") + '</span><span class="tg-name" data-no-i18n>' + esc(name) + '</span>';
+          d.addEventListener("click", fn); d.addEventListener("keydown", e => { if (e.key === "Enter") fn(); }); row.appendChild(d);
+        };
+        const myAv = ($("my-avatar") || {}).innerHTML || "🙂";
+        if (mine) {
+          el("mine has " + (mine.unseen ? "unseen" : "seen"), avatar(mine.user), t("استوری من"), false, () => openStory(mine));
+        } else el("mine", myAv, t("استوری من"), true, addStory);
+        others.forEach(g => el(g.unseen ? "unseen" : "seen", avatar(g.user), g.user.display_name || g.user.username, false, () => openStory(g)));
+      }
+      loadStories();
+      window.CRStoriesRefresh = loadStories;
+      window.addEventListener("cr:stories-changed", loadStories);
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStories(); });
+      setInterval(() => { if (!document.hidden) loadStories(); }, 60000);
+    })();
     side.querySelectorAll("[data-nav-close]").forEach(b => b.addEventListener("click", () => side.classList.remove("open")));
 
     /* ---------- home page: on phones the chat list (with the bottom bar) is the first screen, like Telegram ---------- */
