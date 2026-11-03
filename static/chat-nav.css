@@ -84,3 +84,25 @@ html[dir="rtl"] #open-sidebar svg{transform:scaleX(-1)}
 .priv-sw::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:inset-inline-start .15s}
 .priv-sw:checked{background:var(--aril)}
 .priv-sw:checked::after{inset-inline-start:21px}
+
+/* ---------- Telegram-style top: status title + ⋮ menu + stories row ---------- */
+.side .tg-head{padding-bottom:4px}
+.tg-title{font:700 22px/1.3 var(--display,inherit);color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .2s}
+.tg-title[data-state="connecting"],.tg-title[data-state="off"]{color:var(--aril)}
+.tg-more{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--ink)}
+.tg-more:hover{background:var(--raise)}
+.tg-more svg{width:22px;height:22px;fill:currentColor}
+.tg-stories{display:flex;gap:14px;overflow-x:auto;padding:8px 14px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tg-stories::-webkit-scrollbar{display:none}
+.tg-st{flex:none;width:68px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;color:var(--ink);font-size:12px}
+.tg-ring{position:relative;width:64px;height:64px;border-radius:50%;padding:3px;background:var(--line)}
+.tg-st.unseen .tg-ring{background:conic-gradient(var(--aril),var(--pista,var(--aril)),var(--aril))}
+.tg-st.mine:not(.has) .tg-ring{background:transparent;padding:0}
+.tg-ring .avatar{width:100%;height:100%;border-radius:50%;border:3px solid var(--deck);display:grid;place-items:center;overflow:hidden;font-size:26px;background:var(--raise)}
+.tg-st.mine:not(.has) .avatar{border:0}
+.tg-ring .avatar img{width:100%;height:100%;object-fit:cover}
+.tg-plus{position:absolute;inset-inline-end:-2px;bottom:-2px;width:22px;height:22px;border-radius:50%;background:var(--aril);color:var(--on-aril);border:2px solid var(--deck);display:grid;place-items:center;font-size:15px;line-height:1;font-weight:700}
+.tg-name{max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.tg-st.seen .tg-name{color:var(--mute)}
+.tg-menu{display:flex;flex-direction:column;gap:8px}
+.tg-menu .key{justify-content:flex-start;text-align:start}
