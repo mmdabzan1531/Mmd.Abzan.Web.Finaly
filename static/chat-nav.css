@@ -74,3 +74,6 @@
 .p-tabs button.on{background:color-mix(in srgb,var(--aril) 16%,transparent);color:var(--aril)}
 
 @media(max-width:760px){.nav-bar{inset-inline:14px}}
+
+html[dir="rtl"] #open-sidebar svg{transform:scaleX(-1)}
+@media(max-width:860px){.side .side-head .mobile-only{display:inline-flex}.side{padding-bottom:0}}
