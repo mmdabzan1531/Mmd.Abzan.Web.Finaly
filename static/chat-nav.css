@@ -106,3 +106,7 @@ html[dir="rtl"] #open-sidebar svg{transform:scaleX(-1)}
 .tg-st.seen .tg-name{color:var(--mute)}
 .tg-menu{display:flex;flex-direction:column;gap:8px}
 .tg-menu .key{justify-content:flex-start;text-align:start}
+
+/* no ✕ in the chat list header / pages */
+.side #close-sidebar,.side [data-nav-close],.side .side-head .mobile-only#close-sidebar{display:none!important}
+.tg-st .tg-plus{z-index:2}
