@@ -154,6 +154,15 @@
       return shrink(cv);
     }
 
+    function upload(fd, onp) {
+      return new Promise(res => {
+        const x = new XMLHttpRequest(); x.open("POST", "/api/stories"); x.withCredentials = true;
+        x.upload.onprogress = e => { if (e.lengthComputable) onp(e.loaded / e.total); };
+        x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch (_) {} res({status: x.status, ok: x.status >= 200 && x.status < 300, d}); };
+        x.onerror = x.ontimeout = () => res({status: 0, ok: false, d: {}});
+        x.send(fd);
+      });
+    }
     function composer(init0) {
       const S = {mode: init0.mode || (init0.file ? "photo" : "text"), file: init0.file || null, bg: "g1", bgFile: null, dur: 24, aud: "everyone"};
       let urls = [];
@@ -220,12 +229,17 @@
             if (S.bgFile) { const b = await textOnImage(txt, S.bgFile); fd.set("kind", "image"); fd.set("image", b, "story.jpg"); }
             else { fd.set("kind", "text"); fd.set("text", txt); fd.set("bg", S.bg); }
           }
-          const r = await fetch("/api/stories", {method: "POST", body: fd, credentials: "same-origin"});
-          if (r.status === 401) return void (location.href = "/");
-          const d = await r.json().catch(() => ({}));
-          if (r.ok && d.ok) { closeAll(); toast(t("استوری منتشر شد.")); changed(); }
-          else { if (d.code === "premium_required") openPremium(); else toast(d.error || t("انتشار انجام نشد.")); post.disabled = false; }
-        } catch (_) { toast(t("انتشار انجام نشد.")); post.disabled = false; }
+          const label = t("در حال آپلود…");
+          post.textContent = label;
+          const res = await upload(fd, p => { const n = Math.round(p * 100); post.textContent = label + " " + n.toLocaleString(LOC) + "٪"; post.style.background = "linear-gradient(90deg,var(--aril,#3d9b6a) " + n + "%,rgba(255,255,255,.18) " + n + "%)"; });
+          const d = res.d || {};
+          if (res.status === 401) return void (location.href = "/");
+          if (res.ok && d.ok) { closeAll(); toast(t("استوری منتشر شد و برای بقیه نمایش داده می‌شود.")); changed(); }
+          else {
+            if (d.code === "premium_required") openPremium(); else toast(d.error || (res.status === 413 ? t("حجم فایل زیاد است.") : t("آپلود انجام نشد؛ دوباره تلاش کن.")));
+            post.disabled = false; post.style.background = ""; post.textContent = t("انتشار");
+          }
+        } catch (_) { toast(t("انتشار انجام نشد.")); post.disabled = false; post.style.background = ""; post.textContent = t("انتشار"); }
       };
       drawOpts(); refresh();
     }
@@ -250,5 +264,6 @@
     window.CRStories = {open, compose, add: compose, openViewer: open, openPremium, renderPosts, refresh: changed};
     load().then(() => window.dispatchEvent(new Event("cr:stories-changed")));
     window.addEventListener("cr:story-add", compose);
+    if (C.socket && C.socket.on) C.socket.on("stories_changed", () => { load(); window.dispatchEvent(new Event("cr:stories-changed")); });
   }
 })();
