@@ -123,8 +123,9 @@
       loadStories();
       window.CRStoriesRefresh = loadStories;
       window.addEventListener("cr:stories-changed", loadStories);
+      if (C.socket && C.socket.on) C.socket.on("stories_changed", loadStories);
       document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStories(); });
-      setInterval(() => { if (!document.hidden) loadStories(); }, 60000);
+      setInterval(() => { if (!document.hidden) loadStories(); }, 30000);
     })();
     side.querySelectorAll("[data-nav-close]").forEach(b => b.addEventListener("click", () => side.classList.remove("open")));
 
