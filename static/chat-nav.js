@@ -111,11 +111,12 @@
         const el = (cls, av, name, plus, fn) => {
           const d = document.createElement("div"); d.className = "tg-st " + cls; d.setAttribute("role", "button"); d.tabIndex = 0;
           d.innerHTML = '<span class="tg-ring"><span class="avatar">' + av + '</span>' + (plus ? '<i class="tg-plus">+</i>' : "") + '</span><span class="tg-name" data-no-i18n>' + esc(name) + '</span>';
+          const pl = d.querySelector(".tg-plus"); if (pl && cls.indexOf("has") > -1) pl.addEventListener("click", e => { e.stopPropagation(); addStory(); });
           d.addEventListener("click", fn); d.addEventListener("keydown", e => { if (e.key === "Enter") fn(); }); row.appendChild(d);
         };
         const myAv = ($("my-avatar") || {}).innerHTML || "🙂";
         if (mine) {
-          el("mine has " + (mine.unseen ? "unseen" : "seen"), avatar(mine.user), t("استوری من"), false, () => openStory(mine));
+          el("mine has " + (mine.unseen ? "unseen" : "seen"), avatar(mine.user), t("استوری من"), true, () => openStory(mine));
         } else el("mine", myAv, t("استوری من"), true, addStory);
         others.forEach(g => el(g.unseen ? "unseen" : "seen", avatar(g.user), g.user.display_name || g.user.username, false, () => openStory(g)));
       }
