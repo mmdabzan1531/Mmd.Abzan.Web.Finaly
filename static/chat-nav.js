@@ -186,6 +186,35 @@
       C.sheet("دسترسی به مخاطبین", p, [{label: "اجازه می‌دهم", cls: "hot", fn: syncPhone}, {label: "فعلاً نه"}]);
     }
 
+    /* ---------- privacy (what other people can see) ---------- */
+    const PRIV = [
+      ["show_online", t("آنلاین بودن"), t("دیگران ببینند الان آنلاین هستی")],
+      ["show_phone", t("شماره موبایل"), t("شماره‌ات در پروفایل نمایش داده شود")],
+      ["show_email", t("ایمیل"), t("ایمیلت در پروفایل نمایش داده شود")],
+      ["show_bio", t("بیو"), t("بیوی پروفایل برای دیگران دیده شود")],
+      ["show_birthday", t("تاریخ تولد"), t("تاریخ تولدت در پروفایل نمایش داده شود")]
+    ];
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="privacy-modal"><section class="card"><h2>${esc(t("حریم خصوصی"))}</h2>
+      <p class="status" style="margin:0 0 8px">${esc(t("انتخاب کن دیگران چه چیزهایی از تو ببینند. تغییرات همان لحظه ذخیره می‌شود."))}</p>
+      <div id="priv-list"></div><div class="actions"><button type="button" class="key" id="priv-close">${esc(t("بستن"))}</button></div></section></div>`);
+    const pm = $("privacy-modal");
+    pm.addEventListener("click", e => { if (e.target === pm) C.hideModal("privacy-modal"); });
+    $("priv-close").addEventListener("click", () => C.hideModal("privacy-modal"));
+    async function openPrivacy() {
+      C.showModal("privacy-modal");
+      const u = (await refreshMe()) || cfg.me || {}, box = $("priv-list"); box.innerHTML = "";
+      PRIV.forEach(([key, title, sub]) => {
+        const row = document.createElement("label"); row.className = "priv-row";
+        row.innerHTML = `<span class="s-txt"><strong>${esc(title)}</strong><small>${esc(sub)}</small></span><input type="checkbox" class="priv-sw" ${u[key] ? "checked" : ""}>`;
+        const inp = row.querySelector("input");
+        inp.addEventListener("change", async () => {
+          const d = await jpost("/api/privacy", {[key]: inp.checked});
+          if (d) { cfg.me = d.user; toast("ذخیره شد."); if (side.dataset.tab === "profile") renderProfile(d.user); } else inp.checked = !inp.checked;
+        });
+        box.appendChild(row);
+      });
+    }
+
     /* ---------- settings ---------- */
     let settingsDone = false;
     function renderSettings() {
@@ -204,7 +233,7 @@
         [null, [
           item("#3a8ee6", ICON.user, t("حساب کاربری"), t("نام، بیو، عکس، تاریخ تولد"), () => C.showModal("profile-modal")),
           item("#e59a2e", ICON.chat, t("تنظیمات گفتگو"), t("تم، فونت، پس‌زمینه"), chatSettings),
-          item("#3fae5a", ICON.lock, t("حریم خصوصی"), t("نمایش شماره، ایمیل و تاریخ تولد"), () => openModalAt("profile-show-phone")),
+          item("#3fae5a", ICON.lock, t("حریم خصوصی"), t("نمایش شماره، ایمیل و تاریخ تولد"), openPrivacy),
           item("#8e5bd6", ICON.globe, t("زبان"), t("تغییر زبان برنامه"), () => { const a = $("open-lang"); a ? a.click() : (location.href = "/lang"); })
         ]],
         [t("راهنما"), [
