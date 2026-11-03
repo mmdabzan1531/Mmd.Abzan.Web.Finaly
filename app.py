@@ -585,6 +585,8 @@ def safe_user_public(u, full=False):
     d["show_phone"], d["show_email"] = bool(u.get("show_phone")), bool(u.get("show_email"))
     d["phone"] = u.get("phone", "") if (full or d["show_phone"]) else ""
     d["email"] = u.get("email", "") if (full or d["show_email"]) else ""
+    d["show_birthday"] = bool(u.get("show_birthday"))
+    d["birthday"] = u.get("birthday", "") if (full or d["show_birthday"]) else ""
     return d
 
 
@@ -1564,6 +1566,14 @@ def update_profile():
     avatar = str(request.form.get("avatar", "🙂")).strip()[:12]
     if not display_name:
         return jsonify(error="نام نمایشی نمی‌تواند خالی باشد."), 400
+    birthday = str(request.form.get("birthday", "")).strip()
+    if birthday:
+        try:
+            bd = datetime.strptime(birthday, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify(error="تاریخ تولد معتبر نیست."), 400
+        if bd.year < 1900 or bd > datetime.now().date():
+            return jsonify(error="تاریخ تولد معتبر نیست."), 400
     username = session["username"]
     old_photo = ""
     with data_lock:
@@ -1588,7 +1598,8 @@ def update_profile():
             old_photo = users[username].get("avatar_url", "")
             users[username]["avatar_url"] = "/media/" + filename
         users[username].update(display_name=display_name, bio=bio, avatar=avatar,
-                               show_phone=request.form.get("show_phone") == "1", show_email=request.form.get("show_email") == "1")
+                               show_phone=request.form.get("show_phone") == "1", show_email=request.form.get("show_email") == "1",
+                               birthday=birthday, show_birthday=request.form.get("show_birthday") == "1")
         users[username].setdefault("avatar_url", "")
         write_json(USERS_FILE, users)
         pub = safe_user_public(users[username])
@@ -1690,6 +1701,124 @@ def open_dm():
         d = public_group(groups[gid]); d["last"] = last_msg(gid)
     join_sids(me, gid); join_sids(other, gid)
     return jsonify(ok=True, id=gid, group=d, user=safe_user_public(users[other]))
+
+
+# ---------- my full profile + contacts (Telegram-style bottom bar) ----------
+@app.route("/api/me/profile")
+@api_login
+def my_full_profile():
+    u = read_json(USERS_FILE, {}).get(session["username"])
+    if not u:
+        return jsonify(error="کاربر پیدا نشد."), 404
+    return jsonify(ok=True, user=safe_user_public(u, True))
+
+
+def _find_user_by_ident(users, ident):
+    """username (with/without @) or phone number -> username or None."""
+    ident = str(ident or "").strip()
+    if not ident:
+        return None
+    low = ident.lstrip("@").lower()
+    for n in users:
+        if n.lower() == low:
+            return n
+    ph = norm_phone(ident)
+    if ph:
+        for n, u in users.items():
+            if u.get("phone") and u.get("phone") == ph:
+                return n
+    return None
+
+
+def _contacts_payload(users, me):
+    saved = users.get(me, {}).get("contacts") or {}
+    out = []
+    for name, custom in saved.items():
+        if name in users and name != me:
+            out.append({"username": name, "name": str(custom or "")[:60], "user": safe_user_public(users[name])})
+    out.sort(key=lambda c: (c["name"] or c["user"]["display_name"] or c["username"]).lower())
+    return out
+
+
+@app.route("/api/contacts", methods=["GET", "POST"])
+@api_login
+def api_contacts():
+    me = session["username"]
+    if request.method == "GET":
+        return jsonify(ok=True, contacts=_contacts_payload(read_json(USERS_FILE, {}), me))
+    d = request.get_json(silent=True) or {}
+    custom = str(d.get("name", "")).strip()[:60]
+    with data_lock:
+        users = read_json(USERS_FILE, {})
+        if me not in users:
+            return jsonify(error="کاربر پیدا نشد."), 404
+        other = _find_user_by_ident(users, d.get("ident"))
+        if not other or other == me or other == BOT_USER:
+            return jsonify(error="کاربری با این نام کاربری یا شماره پیدا نشد."), 404
+        contacts = users[me].get("contacts")
+        if not isinstance(contacts, dict):
+            contacts = {}
+        if len(contacts) >= 2000 and other not in contacts:
+            return jsonify(error="سقف تعداد مخاطبین پر شده است."), 400
+        contacts[other] = custom
+        users[me]["contacts"] = contacts
+        write_json(USERS_FILE, users)
+        res = _contacts_payload(users, me)
+    return jsonify(ok=True, contacts=res, added=other)
+
+
+@app.route("/api/contacts/<username>", methods=["DELETE"])
+@api_login
+def api_contact_delete(username):
+    me = session["username"]
+    with data_lock:
+        users = read_json(USERS_FILE, {})
+        contacts = (users.get(me) or {}).get("contacts")
+        if isinstance(contacts, dict) and username in contacts:
+            del contacts[username]
+            users[me]["contacts"] = contacts
+            write_json(USERS_FILE, users)
+        res = _contacts_payload(users, me)
+    return jsonify(ok=True, contacts=res)
+
+
+@app.route("/api/contacts/match", methods=["POST"])
+@api_login
+def api_contacts_match():
+    """The phone's address book (picked by the user in the browser) -> which numbers are registered here.
+    Phone numbers are only compared, never stored. Matches are saved as contacts under the phone-book name."""
+    me = session["username"]
+    items = (request.get_json(silent=True) or {}).get("items")
+    if not isinstance(items, list):
+        return jsonify(error="درخواست نامعتبر است."), 400
+    wanted = {}
+    for it in items[:600]:
+        if not isinstance(it, dict):
+            continue
+        nm = str(it.get("name", "")).strip()[:60]
+        for p in (it.get("phones") or [])[:5]:
+            ph = norm_phone(p)
+            if ph and ph not in wanted:
+                wanted[ph] = nm
+    with data_lock:
+        users = read_json(USERS_FILE, {})
+        if me not in users:
+            return jsonify(error="کاربر پیدا نشد."), 404
+        by_phone = {u.get("phone"): n for n, u in users.items() if u.get("phone") and n not in (me, BOT_USER)}
+        contacts = users[me].get("contacts")
+        if not isinstance(contacts, dict):
+            contacts = {}
+        found = 0
+        for ph, nm in wanted.items():
+            n = by_phone.get(ph)
+            if n:
+                found += 1
+                if len(contacts) < 2000 or n in contacts:
+                    contacts[n] = nm or contacts.get(n, "")
+        users[me]["contacts"] = contacts
+        write_json(USERS_FILE, users)
+        res = _contacts_payload(users, me)
+    return jsonify(ok=True, contacts=res, found=found, total=len(wanted))
 
 
 @app.route("/api/users/search")
