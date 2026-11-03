@@ -716,9 +716,10 @@
     const fd = new FormData();
     fd.append("avatar", $("profile-avatar").value); fd.append("display_name", $("profile-name").value); fd.append("bio", $("profile-bio").value);
     fd.append("show_phone", $("profile-show-phone").checked ? "1" : "0"); fd.append("show_email", $("profile-show-email").checked ? "1" : "0");
+    fd.append("birthday", $("profile-birthday").value || ""); fd.append("show_birthday", $("profile-show-birthday").checked ? "1" : "0");
     const photo = $("profile-photo").files[0]; if (photo) fd.append("avatar_photo", photo);
     const d = await post("/api/profile", {method: "POST", body: fd}, $("profile-status"), "پروفایل ذخیره شد.", "profile-modal");
-    if (d) users[d.user.username] = d.user;
+    if (d) { users[d.user.username] = d.user; window.dispatchEvent(new Event("cr:profile-saved")); }
   });
   $("save-group").addEventListener("click", () => post(`/api/group/${encodeURIComponent(activeGroup)}`,
     {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name: $("edit-group-name").value, description: $("edit-group-description").value})},
