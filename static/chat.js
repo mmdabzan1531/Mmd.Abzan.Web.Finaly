@@ -30,7 +30,7 @@
   const saveLR = () => { try { localStorage.setItem(LR_KEY, JSON.stringify(lastRead)); } catch (_) {} };
 
   let stored = ""; try { stored = localStorage.getItem(LAST_KEY) || ""; } catch (_) {}
-  let activeGroup = groups[cfg.initialGroup] ? cfg.initialGroup : (groups[stored] ? stored : "");
+  let activeGroup = groups[cfg.initialGroup] ? cfg.initialGroup : "";   // no chat opens on entry; only an explicit link (?group=…, invite) does
   let online = new Set(), msgs = [], hasMore = false, loadingOlder = false, ctx = null;
   let menuFor = null, lastTap = {}, awayCount = 0, failures = 0;
   const typers = new Map();
@@ -251,7 +251,7 @@
     if (!groups[id]) return;
     activeGroup = id; httpLoaded = ""; msgs = []; hasMore = false; clearCtx(); closeMenu(); typers.clear(); renderTyping();
     try { localStorage.setItem(LAST_KEY, id); } catch (_) {}
-    history.replaceState(null, "", "?group=" + encodeURIComponent(id));
+    history.replaceState(null, "", location.pathname);
     feed.innerHTML = `<div class="empty"><p>${esc(t("در حال بارگذاری…"))}</p></div>`;
     updateHeader(); renderGroupList(); renderMembers();
     socket.emit("select_group", {group_id: id}); if (!live()) setTimeout(pollHttp, 50);
