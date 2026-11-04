@@ -62,18 +62,34 @@
       </nav>`);
     side.dataset.tab = "chats";
 
-    /* ---------- members: on phones show the list in a sheet (the side drawer went black) ---------- */
-    (function membersSheet() {
-      const inDrawer = () => { const b = $("close-members"); return !!b && getComputedStyle(b).display !== "none"; };
+    /* profile edit window: hide the theme / font / background / support / about rows (also when the page was not re-rendered) */
+    ["theme-open", "font-open", "cb-open-me"].forEach(id => { const e = $(id); if (e && e.parentElement) e.parentElement.style.display = "none"; });
+    document.querySelectorAll('#profile-modal a[href*="support"],#profile-modal a[href*="about"]').forEach(a => { a.style.display = "none"; if (a.parentElement && a.parentElement.classList.contains("row2")) a.parentElement.style.display = "none"; });
+
+    /* ---------- members: on phones a self-contained full-screen list (the side drawer went black) ---------- */
+    (function membersView() {
+      const isPhone = () => window.matchMedia("(max-width:860px)").matches;
+      function openMembers() {
+        const g = C.groups[C.activeGroup]; if (!g) return;
+        const rank = {owner: 0, admin: 1, member: 2}, online = C.online || new Set();
+        const names = [...(g.members || [])].sort((x, y) => ((rank[C.roleOf(g, x)] || 2) - (rank[C.roleOf(g, y)] || 2)) || ((online.has(y) ? 1 : 0) - (online.has(x) ? 1 : 0)) || x.localeCompare(y));
+        const ov = document.createElement("div"); ov.className = "mb-ov";
+        const nOn = names.filter(n => online.has(n)).length;
+        ov.innerHTML = '<div class="mb-head"><button type="button" class="mb-x" aria-label="' + esc(t("بستن")) + '"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div class="mb-title"><strong>' + esc(t("اعضا")) + '</strong><small>' + names.length.toLocaleString() + ' ' + esc(t("عضو")) + ' · ' + nOn.toLocaleString() + ' ' + esc(t("آنلاین")) + '</small></div></div><div class="mb-list"></div>';
+        const list = ov.querySelector(".mb-list"), close = () => { ov.remove(); document.removeEventListener("keydown", onKey); }, onKey = e => { if (e.key === "Escape") close(); };
+        names.forEach(name => {
+          const u = C.profileOf(name), role = C.roleOf(g, name), row = document.createElement("button"); row.type = "button"; row.className = "mb-row";
+          const badge = g.type !== "dm" && role !== "member" ? '<em class="mb-role ' + role + '">' + esc(t(role === "owner" ? "مالک" : "ادمین")) + "</em>" : "";
+          row.innerHTML = '<span class="mb-av">' + C.avatarHtml(u) + '</span><span class="mb-info" data-no-i18n><strong>' + esc(u.display_name || name) + "</strong><span>@" + esc(name) + "</span></span>" + badge + '<i class="mb-dot' + (online.has(name) ? " on" : "") + '"></i>';
+          row.onclick = () => { close(); (name === cfg.username || g.type === "dm") ? C.openUserProfile(name) : C.openMemberSheet(name); };
+          list.appendChild(row);
+        });
+        ov.querySelector(".mb-x").onclick = close; document.addEventListener("keydown", onKey); document.body.appendChild(ov);
+      }
       document.addEventListener("click", e => {
         const b = e.target.closest && e.target.closest("#open-members");
-        if (!b || !inDrawer()) return;
-        e.stopImmediatePropagation(); e.preventDefault();
-        const list = $("members-list"), home = $("people"); if (!list || !home) return;
-        const box = document.createElement("div"); box.style.cssText = "max-height:60vh;overflow-y:auto"; box.appendChild(list);
-        const cnt = ($("member-count") || {}).textContent;
-        C.sheet(t("اعضا") + (cnt && cnt !== "0" ? " (" + cnt + ")" : ""), box, [{label: "بستن"}]);
-        const iv = setInterval(() => { if (!box.isConnected) { clearInterval(iv); if (list.parentNode !== home) home.appendChild(list); } }, 250);   // give the list back to the page when the sheet closes
+        if (!b || !isPhone()) return;
+        e.stopImmediatePropagation(); e.preventDefault(); openMembers();
       }, true);
     })();
 
@@ -166,6 +182,8 @@
     function goHome() { setTab("chats"); if (phone()) side.classList.add("open"); }
     goHome();
     window.addEventListener("load", () => { if (!hasDeepLink) goHome(); });
+    let touched = false; addEventListener("pointerdown", () => { touched = true; }, {once: true, capture: true});
+    [300, 1200, 2500].forEach(ms => setTimeout(() => { if (!touched && !hasDeepLink) goHome(); }, ms));   // in case anything re-opens the last chat after load
     window.addEventListener("pageshow", e => { if (e.persisted) goHome(); });                  // coming back from the browser's back-forward cache
     let hiddenAt = 0;
     document.addEventListener("visibilitychange", () => {
