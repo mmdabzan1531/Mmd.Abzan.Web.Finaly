@@ -70,9 +70,9 @@
     (function membersView() {
       const isPhone = () => window.matchMedia("(max-width:860px)").matches;
       function openMembers() {
-        const g = C.groups[C.activeGroup]; if (!g) return;
+        const g = C.groups[C.activeGroup]; if (!g) { toast(t("اول یک گفتگو را باز کن.")); return; }
         const rank = {owner: 0, admin: 1, member: 2}, online = C.online || new Set();
-        const names = [...(g.members || [])].sort((x, y) => ((rank[C.roleOf(g, x)] || 2) - (rank[C.roleOf(g, y)] || 2)) || ((online.has(y) ? 1 : 0) - (online.has(x) ? 1 : 0)) || x.localeCompare(y));
+        const names = [...(g.members || [])].sort((x, y) => ((rank[C.roleOf(g, x)] ?? 2) - (rank[C.roleOf(g, y)] ?? 2)) || ((online.has(y) ? 1 : 0) - (online.has(x) ? 1 : 0)) || x.localeCompare(y));
         const ov = document.createElement("div"); ov.className = "mb-ov";
         const nOn = names.filter(n => online.has(n)).length;
         ov.innerHTML = '<div class="mb-head"><button type="button" class="mb-x" aria-label="' + esc(t("بستن")) + '"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div class="mb-title"><strong>' + esc(t("اعضا")) + '</strong><small>' + names.length.toLocaleString() + ' ' + esc(t("عضو")) + ' · ' + nOn.toLocaleString() + ' ' + esc(t("آنلاین")) + '</small></div></div><div class="mb-list"></div>';
@@ -86,11 +86,15 @@
         });
         ov.querySelector(".mb-x").onclick = close; document.addEventListener("keydown", onKey); document.body.appendChild(ov);
       }
-      document.addEventListener("click", e => {
-        const b = e.target.closest && e.target.closest("#open-members");
-        if (!b || !isPhone()) return;
-        e.stopImmediatePropagation(); e.preventDefault(); openMembers();
+      const isMembersBtn = b => !!b && (b.id === "open-members" || b.classList.contains("members-toggle") || b.hasAttribute("data-members"));
+      /* on window (capture) so it runs BEFORE chat-plus.js, whose own capture listener on document would swallow the click */
+      window.addEventListener("click", e => {
+        const b = e.target.closest && e.target.closest("button,a,[role=button]");
+        if (!isMembersBtn(b) || !isPhone()) return;
+        e.stopImmediatePropagation(); e.preventDefault();
+        try { openMembers(); } catch (err) { toast("خطا در باز کردن اعضا: " + (err && err.message)); }
       }, true);
+      window.CRMembers = openMembers;
     })();
 
     /* ---------- Telegram-style top: status title, ⋮ menu, stories row ---------- */
