@@ -66,41 +66,6 @@
     ["theme-open", "font-open", "cb-open-me"].forEach(id => { const e = $(id); if (e && e.parentElement) e.parentElement.style.display = "none"; });
     document.querySelectorAll('#profile-modal a[href*="support"],#profile-modal a[href*="about"]').forEach(a => { a.style.display = "none"; if (a.parentElement && a.parentElement.classList.contains("row2")) a.parentElement.style.display = "none"; });
 
-    /* ---------- members: on phones a self-contained full-screen list (the side drawer went black) ---------- */
-    (function membersView() {
-      const isPhone = () => window.matchMedia("(max-width:860px)").matches;
-      function openMembers() {
-        const g = C.groups[C.activeGroup]; if (!g) { toast(t("اول یک گفتگو را باز کن.")); return; }
-        const rank = {owner: 0, admin: 1, member: 2}, online = C.online || new Set();
-        const names = [...(g.members || [])].sort((x, y) => ((rank[C.roleOf(g, x)] ?? 2) - (rank[C.roleOf(g, y)] ?? 2)) || ((online.has(y) ? 1 : 0) - (online.has(x) ? 1 : 0)) || x.localeCompare(y));
-        const ov = document.createElement("div"); ov.className = "mb-ov";
-        const nOn = names.filter(n => online.has(n)).length;
-        ov.innerHTML = '<aside class="mb-panel"><div class="mb-count"><strong>' + names.length.toLocaleString() + '</strong><small>' + nOn.toLocaleString() + ' ●</small></div><div class="mb-list"></div></aside>';
-        const panel = ov.querySelector(".mb-panel"), list = ov.querySelector(".mb-list");
-        let closing = false;
-        const onKey = e => { if (e.key === "Escape") close(); };
-        const close = cb => { if (closing) return; closing = true; document.removeEventListener("keydown", onKey); ov.classList.remove("in"); setTimeout(() => { ov.remove(); typeof cb === "function" && cb(); }, 240); };
-        names.forEach(name => {
-          const u = C.profileOf(name), role = C.roleOf(g, name), row = document.createElement("button"); row.type = "button"; row.className = "mb-row";
-          const crown = g.type !== "dm" && role !== "member" ? '<em class="mb-role">' + (role === "owner" ? "👑" : "⭐") + "</em>" : "";
-          row.innerHTML = '<span class="mb-av">' + C.avatarHtml(u) + crown + '<i class="mb-dot' + (online.has(name) ? " on" : "") + '"></i></span><span class="mb-name" data-no-i18n>' + esc(u.display_name || name) + "</span>";
-          row.onclick = () => close(() => { (name === cfg.username || g.type === "dm") ? C.openUserProfile(name) : C.openMemberSheet(name); });
-          list.appendChild(row);
-        });
-        ov.addEventListener("click", e => { if (!panel.contains(e.target)) close(); });
-        document.addEventListener("keydown", onKey); document.body.appendChild(ov); requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add("in")));
-      }
-      const isMembersBtn = b => !!b && (b.id === "open-members" || b.classList.contains("members-toggle") || b.hasAttribute("data-members"));
-      /* on window (capture) so it runs BEFORE chat-plus.js, whose own capture listener on document would swallow the click */
-      window.addEventListener("click", e => {
-        const b = e.target.closest && e.target.closest("button,a,[role=button]");
-        if (!isMembersBtn(b) || !isPhone()) return;
-        e.stopImmediatePropagation(); e.preventDefault();
-        try { openMembers(); } catch (err) { toast("خطا در باز کردن اعضا: " + (err && err.message)); }
-      }, true);
-      window.CRMembers = openMembers;
-    })();
-
     /* ---------- Telegram-style top: status title, ⋮ menu, stories row ---------- */
     (function topBar() {
       const title = $("tg-title"), txt = $("tg-title-text"), conn = $("conn");
