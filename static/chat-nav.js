@@ -62,6 +62,21 @@
       </nav>`);
     side.dataset.tab = "chats";
 
+    /* ---------- members: on phones show the list in a sheet (the side drawer went black) ---------- */
+    (function membersSheet() {
+      const inDrawer = () => { const b = $("close-members"); return !!b && getComputedStyle(b).display !== "none"; };
+      document.addEventListener("click", e => {
+        const b = e.target.closest && e.target.closest("#open-members");
+        if (!b || !inDrawer()) return;
+        e.stopImmediatePropagation(); e.preventDefault();
+        const list = $("members-list"), home = $("people"); if (!list || !home) return;
+        const box = document.createElement("div"); box.style.cssText = "max-height:60vh;overflow-y:auto"; box.appendChild(list);
+        const cnt = ($("member-count") || {}).textContent;
+        C.sheet(t("اعضا") + (cnt && cnt !== "0" ? " (" + cnt + ")" : ""), box, [{label: "بستن"}]);
+        const iv = setInterval(() => { if (!box.isConnected) { clearInterval(iv); if (list.parentNode !== home) home.appendChild(list); } }, 250);   // give the list back to the page when the sheet closes
+      }, true);
+    })();
+
     /* ---------- Telegram-style top: status title, ⋮ menu, stories row ---------- */
     (function topBar() {
       const title = $("tg-title"), txt = $("tg-title-text"), conn = $("conn");
@@ -145,6 +160,18 @@
       if (name === "profile") loadProfile();
     }
     $("nav-bar").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) setTab(b.dataset.tab); });
+
+    /* ---------- entering the app always lands on the chat list ---------- */
+    const hasDeepLink = /[?&]group=/.test(location.search);          // invite links still go straight to their group
+    function goHome() { setTab("chats"); if (phone()) side.classList.add("open"); }
+    goHome();
+    window.addEventListener("load", () => { if (!hasDeepLink) goHome(); });
+    window.addEventListener("pageshow", e => { if (e.persisted) goHome(); });                  // coming back from the browser's back-forward cache
+    let hiddenAt = 0;
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > 180000) { hiddenAt = 0; goHome(); }         // re-opening the app after 3+ minutes
+    });
     window.addEventListener("cr:profile-saved", () => { if (side.dataset.tab === "profile") loadProfile(); else refreshMe(); });
 
     /* unread badge on "Chats" = sum of the badges in the chat list */
@@ -293,12 +320,12 @@
         [[t("🎨 تم‌ها"), () => window.CRTheme && window.CRTheme.openPicker()], [t("🔤 فونت‌ها"), () => window.CRTheme && window.CRTheme.openFontPicker()], [t("🖼 پس‌زمینه چت"), () => { const b = $("open-my-background"); b && b.click(); }]].forEach(([label, fn]) => {
           const b = document.createElement("button"); b.type = "button"; b.className = "key"; b.textContent = label; b.onclick = () => { C.hideModal("sheet"); fn(); }; box.appendChild(b);
         });
-        C.sheet("تنظیمات گفتگو", box, [{label: "بستن"}]);
+        C.sheet("تنظیمات ظاهری گفتگو", box, [{label: "بستن"}]);
       };
       const groups = [
         [null, [
           item("#3a8ee6", ICON.user, t("حساب کاربری"), t("نام، بیو، عکس، تاریخ تولد"), () => C.showModal("profile-modal")),
-          item("#e59a2e", ICON.chat, t("تنظیمات گفتگو"), t("تم، فونت، پس‌زمینه"), chatSettings),
+          item("#e59a2e", ICON.chat, t("تنظیمات ظاهری گفتگو"), t("تم، فونت، پس‌زمینه"), chatSettings),
           item("#3fae5a", ICON.lock, t("حریم خصوصی"), t("نمایش شماره، ایمیل و تاریخ تولد"), openPrivacy),
           item("#f5b301", '<svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>', t("پریمیوم"), t("استوری ۴۸ و ۷۲ ساعته"), () => window.CRStories && window.CRStories.openPremium()),
           item("#8e5bd6", ICON.globe, t("زبان"), t("تغییر زبان برنامه"), () => { const a = $("open-lang"); a ? a.click() : (location.href = "/lang"); })
