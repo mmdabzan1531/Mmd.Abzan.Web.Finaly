@@ -75,16 +75,20 @@
         const names = [...(g.members || [])].sort((x, y) => ((rank[C.roleOf(g, x)] ?? 2) - (rank[C.roleOf(g, y)] ?? 2)) || ((online.has(y) ? 1 : 0) - (online.has(x) ? 1 : 0)) || x.localeCompare(y));
         const ov = document.createElement("div"); ov.className = "mb-ov";
         const nOn = names.filter(n => online.has(n)).length;
-        ov.innerHTML = '<div class="mb-head"><button type="button" class="mb-x" aria-label="' + esc(t("بستن")) + '"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div class="mb-title"><strong>' + esc(t("اعضا")) + '</strong><small>' + names.length.toLocaleString() + ' ' + esc(t("عضو")) + ' · ' + nOn.toLocaleString() + ' ' + esc(t("آنلاین")) + '</small></div></div><div class="mb-list"></div>';
-        const list = ov.querySelector(".mb-list"), close = () => { ov.remove(); document.removeEventListener("keydown", onKey); }, onKey = e => { if (e.key === "Escape") close(); };
+        ov.innerHTML = '<aside class="mb-panel"><div class="mb-count"><strong>' + names.length.toLocaleString() + '</strong><small>' + nOn.toLocaleString() + ' ●</small></div><div class="mb-list"></div></aside>';
+        const panel = ov.querySelector(".mb-panel"), list = ov.querySelector(".mb-list");
+        let closing = false;
+        const onKey = e => { if (e.key === "Escape") close(); };
+        const close = cb => { if (closing) return; closing = true; document.removeEventListener("keydown", onKey); ov.classList.remove("in"); setTimeout(() => { ov.remove(); typeof cb === "function" && cb(); }, 240); };
         names.forEach(name => {
           const u = C.profileOf(name), role = C.roleOf(g, name), row = document.createElement("button"); row.type = "button"; row.className = "mb-row";
-          const badge = g.type !== "dm" && role !== "member" ? '<em class="mb-role ' + role + '">' + esc(t(role === "owner" ? "مالک" : "ادمین")) + "</em>" : "";
-          row.innerHTML = '<span class="mb-av">' + C.avatarHtml(u) + '</span><span class="mb-info" data-no-i18n><strong>' + esc(u.display_name || name) + "</strong><span>@" + esc(name) + "</span></span>" + badge + '<i class="mb-dot' + (online.has(name) ? " on" : "") + '"></i>';
-          row.onclick = () => { close(); (name === cfg.username || g.type === "dm") ? C.openUserProfile(name) : C.openMemberSheet(name); };
+          const crown = g.type !== "dm" && role !== "member" ? '<em class="mb-role">' + (role === "owner" ? "👑" : "⭐") + "</em>" : "";
+          row.innerHTML = '<span class="mb-av">' + C.avatarHtml(u) + crown + '<i class="mb-dot' + (online.has(name) ? " on" : "") + '"></i></span><span class="mb-name" data-no-i18n>' + esc(u.display_name || name) + "</span>";
+          row.onclick = () => close(() => { (name === cfg.username || g.type === "dm") ? C.openUserProfile(name) : C.openMemberSheet(name); });
           list.appendChild(row);
         });
-        ov.querySelector(".mb-x").onclick = close; document.addEventListener("keydown", onKey); document.body.appendChild(ov);
+        ov.addEventListener("click", e => { if (!panel.contains(e.target)) close(); });
+        document.addEventListener("keydown", onKey); document.body.appendChild(ov); requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add("in")));
       }
       const isMembersBtn = b => !!b && (b.id === "open-members" || b.classList.contains("members-toggle") || b.hasAttribute("data-members"));
       /* on window (capture) so it runs BEFORE chat-plus.js, whose own capture listener on document would swallow the click */
