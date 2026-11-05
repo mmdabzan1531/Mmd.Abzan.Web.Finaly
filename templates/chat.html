@@ -96,4 +96,180 @@ window.CHATROOM = {
 <script src="{{ url_for('static', filename='chat-plus.js') }}?v={{ ASSET_V }}"></script>
 <script src="{{ url_for('static', filename='chat-nav.js') }}?v={{ ASSET_V }}"></script>
 <script src="{{ url_for('static', filename='stories.js') }}?v={{ ASSET_V }}"></script>
+<script>
+/* privacy dialog (self-contained) */
+(function () {
+  "use strict";
+  var ITEMS = [
+    ["بخش: چه چیزهایی دیده شود", null],
+    ["show_online", "آنلاین بودن", "دیگران ببینند الان آنلاین هستی"],
+    ["show_avatar", "عکس پروفایل", "عکس و ایموجی پروفایلت برای دیگران دیده شود"],
+    ["show_bio", "بیو", "بیوی پروفایل برای دیگران دیده شود"],
+    ["show_phone", "شماره موبایل", "شماره‌ات در پروفایل نمایش داده شود"],
+    ["show_email", "ایمیل", "ایمیلت در پروفایل نمایش داده شود"],
+    ["show_birthday", "تاریخ تولد", "تاریخ تولدت در پروفایل نمایش داده شود"],
+    ["بخش: ارتباط با تو", null],
+    ["allow_dm", "پیام از همه", "اگر خاموش باشد فقط مخاطبین تو می‌توانند پیام خصوصی بدهند"],
+    ["searchable", "پیدا شدن در جستجو", "دیگران با جستجوی نام یا نام‌کاربری پیدایت کنند"]
+  ];
+  var PROFILE_CB = {show_phone: "profile-show-phone", show_email: "profile-show-email", show_birthday: "profile-show-birthday"};
+  var root, state = {}, busy = {};
+
+  function css() {
+    if (document.getElementById("pv-css")) return;
+    var s = document.createElement("style"); s.id = "pv-css";
+    s.textContent =
+      "#pv-ov{position:fixed;inset:0;z-index:99998;background:rgba(20,16,24,.55);display:flex;align-items:center;justify-content:center;padding:14px}" +
+      "#pv-ov[hidden]{display:none}" +
+      "#pv-card{background:var(--card,#fff);color:var(--ink,#3b1f2b);width:100%;max-width:460px;max-height:92vh;overflow:auto;border-radius:28px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-family:inherit}" +
+      "#pv-card h2{margin:0 0 6px;font-size:26px}#pv-card .pv-sub{margin:0 0 10px;font-size:14px;opacity:.75;line-height:1.7}" +
+      "#pv-card h4{margin:16px 0 2px;font-size:13px;opacity:.6;font-weight:700}" +
+      ".pv-row{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid rgba(160,90,120,.18);cursor:pointer}" +
+      ".pv-row:last-of-type{border-bottom:0}.pv-txt{flex:1;min-width:0}.pv-txt b{display:block;font-size:16px}.pv-txt small{display:block;opacity:.7;font-size:13px;margin-top:3px;line-height:1.6}" +
+      ".pv-sw{appearance:none;-webkit-appearance:none;flex:none;width:50px;height:30px;border-radius:30px;background:#c9c2c6;position:relative;transition:.2s;outline:0;cursor:pointer;margin:0}" +
+      ".pv-sw:after{content:'';position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}" +
+      ".pv-sw:checked{background:var(--accent,#d6456e)}.pv-sw:checked:after{right:23px}.pv-sw:disabled{opacity:.5}" +
+      ".pv-blk{display:flex;align-items:center;gap:10px;padding:9px 4px}.pv-blk span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      ".pv-btn{border:0;border-radius:16px;padding:9px 16px;background:#f9dbe4;color:#7a2845;font:inherit;font-weight:700;cursor:pointer}" +
+      ".pv-add{display:flex;gap:8px;margin-top:6px}.pv-add input{flex:1;min-width:0;border:1px solid rgba(160,90,120,.35);border-radius:14px;padding:9px 12px;font:inherit;background:transparent;color:inherit}" +
+      "#pv-st{min-height:20px;margin:10px 0 0;font-size:13px;text-align:center}.pv-foot{display:flex;justify-content:flex-start;margin-top:12px}";
+    document.head.appendChild(s);
+  }
+
+  function st(msg, bad) {
+    var e = document.getElementById("pv-st"); if (!e) return;
+    e.textContent = msg || ""; e.style.color = bad ? "#c0392b" : "#2e7d4f";
+    clearTimeout(st.t); if (msg) st.t = setTimeout(function () { e.textContent = ""; }, 2200);
+  }
+
+  function api(url, method, body) {
+    var o = {method: method || "GET", credentials: "same-origin", headers: {"Accept": "application/json"}};
+    if (body !== undefined) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(body); }
+    return fetch(url, o).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok || j.error) throw new Error(j.error || ("خطا " + r.status)); return j;
+      });
+    });
+  }
+
+  function syncProfileForm(p) {
+    Object.keys(PROFILE_CB).forEach(function (k) {
+      var c = document.getElementById(PROFILE_CB[k]); if (c && k in p) c.checked = !!p[k];
+    });
+    try { if (window.CHATROOM && window.CHATROOM.me) Object.keys(p).forEach(function (k) { window.CHATROOM.me[k] = p[k]; }); } catch (e) {}
+  }
+
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+
+  function build() {
+    css();
+    if (root) root.remove();
+    root = document.createElement("div"); root.id = "pv-ov"; root.hidden = true; root.dir = "rtl";
+    var h = '<section id="pv-card" role="dialog" aria-modal="true" aria-label="حریم خصوصی"><h2>حریم خصوصی</h2>' +
+      '<p class="pv-sub">انتخاب کن دیگران چه چیزهایی از تو ببینند. تغییرات همان لحظه ذخیره می‌شود.</p>';
+    ITEMS.forEach(function (it) {
+      if (it[1] === null) { h += "<h4>" + esc(it[0].replace("بخش: ", "")) + "</h4>"; return; }
+      h += '<label class="pv-row"><div class="pv-txt"><b>' + esc(it[1]) + "</b><small>" + esc(it[2]) +
+           '</small></div><input type="checkbox" class="pv-sw" data-k="' + it[0] + '"></label>';
+    });
+    h += '<h4>کاربران مسدودشده</h4><div id="pv-blocked"><small style="opacity:.6">در حال بارگذاری…</small></div>' +
+      '<div class="pv-add"><input id="pv-block-in" dir="ltr" placeholder="نام‌کاربری برای مسدود کردن" autocomplete="off" autocapitalize="off"><button type="button" class="pv-btn" id="pv-block-btn">مسدود</button></div>' +
+      '<p id="pv-st" role="status"></p><div class="pv-foot"><button type="button" class="pv-btn" id="pv-close">بستن</button></div></section>';
+    root.innerHTML = h;
+    document.body.appendChild(root);
+
+    root.addEventListener("click", function (e) { if (e.target === root) close(); });
+    root.querySelector("#pv-close").addEventListener("click", close);
+    root.querySelectorAll(".pv-sw").forEach(function (cb) { cb.addEventListener("change", onToggle); });
+    root.querySelector("#pv-block-btn").addEventListener("click", function () {
+      var inp = root.querySelector("#pv-block-in"), u = inp.value.trim().replace(/^@/, "");
+      if (u) block(u, true).then(function (ok) { if (ok) inp.value = ""; });
+    });
+    root.querySelector("#pv-block-in").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); root.querySelector("#pv-block-btn").click(); }
+    });
+    root.querySelector("#pv-blocked").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-unblock]"); if (b) block(b.getAttribute("data-unblock"), false);
+    });
+  }
+
+  function onToggle(e) {
+    var cb = e.target, k = cb.getAttribute("data-k"), want = cb.checked;
+    if (busy[k]) { cb.checked = !want; return; }
+    busy[k] = true; cb.disabled = true;
+    var body = {}; body[k] = want;
+    api("/api/privacy", "POST", body).then(function (j) {
+      state = j.privacy || state; cb.checked = !!state[k]; syncProfileForm(state); st("ذخیره شد ✓");
+    }).catch(function (err) { cb.checked = !want; st(err.message || "ذخیره نشد", true); })
+      .then(function () { busy[k] = false; cb.disabled = false; });
+  }
+
+  function renderBlocked(list) {
+    var box = root.querySelector("#pv-blocked");
+    if (!list.length) { box.innerHTML = '<small style="opacity:.6">کسی را مسدود نکرده‌ای.</small>'; return; }
+    box.innerHTML = list.map(function (u) {
+      return '<div class="pv-blk"><span>' + esc(u.avatar || "🙂") + " " + esc(u.display_name || u.username) +
+        ' <small dir="ltr" style="opacity:.6">@' + esc(u.username) + '</small></span><button type="button" class="pv-btn" data-unblock="' +
+        esc(u.username) + '">رفع مسدودی</button></div>';
+    }).join("");
+  }
+
+  function loadBlocked() {
+    return api("/api/blocked").then(function (j) { renderBlocked(j.users || []); })
+      .catch(function (e) { root.querySelector("#pv-blocked").innerHTML = '<small style="color:#c0392b">' + esc(e.message) + "</small>"; });
+  }
+
+  function block(u, yes) {
+    return api("/api/block", "POST", {username: u, block: yes}).then(function () {
+      st(yes ? "مسدود شد" : "از حالت مسدود درآمد"); return loadBlocked().then(function () { return true; });
+    }).catch(function (e) { st(e.message || "انجام نشد", true); return false; });
+  }
+
+  function open() {
+    if (!root || !document.body.contains(root)) build();
+    root.hidden = false; document.documentElement.style.overflow = "hidden";
+    root.querySelectorAll(".pv-sw").forEach(function (cb) { cb.disabled = true; });
+    api("/api/privacy").then(function (j) {
+      state = j.privacy || {};
+      root.querySelectorAll(".pv-sw").forEach(function (cb) { cb.checked = !!state[cb.getAttribute("data-k")]; cb.disabled = false; });
+      syncProfileForm(state);
+    }).catch(function (e) { st(e.message || "بارگذاری نشد", true); });
+    loadBlocked();
+  }
+  function close() { if (root) root.hidden = true; document.documentElement.style.overflow = ""; }
+  window.openPrivacy = open;
+
+  /* take over the existing "حریم خصوصی" row in the settings list (capture phase beats the broken handler) */
+  document.addEventListener("click", function (e) {
+    if (root && root.contains(e.target)) return;
+    var el = e.target;
+    for (var i = 0; el && el !== document.body && i < 7; i++, el = el.parentElement) {
+      var t = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (t.indexOf("حریم خصوصی") === 0 && t.length < 90) {
+        if (el.closest(".modal.open, .modal.show, .modal[open]")) return;
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); open(); return;
+      }
+      if (t.length > 90) break;
+    }
+  }, true);
+
+  /* block / unblock button inside the user profile popup */
+  function addBlockBtn() {
+    var box = document.querySelector("#user-view-modal .actions");
+    if (!box || document.getElementById("view-block")) return;
+    var b = document.createElement("button"); b.type = "button"; b.className = "key"; b.id = "view-block"; b.textContent = "مسدود / رفع مسدودی";
+    b.addEventListener("click", function () {
+      var u = (document.getElementById("view-user-id").textContent || "").replace(/^@/, "").trim(); if (!u) return;
+      api("/api/blocked").then(function (j) {
+        var was = (j.users || []).some(function (x) { return x.username === u; });
+        return api("/api/block", "POST", {username: u, block: !was}).then(function () {
+          alert(was ? "از حالت مسدود درآمد." : "کاربر مسدود شد.");
+        });
+      }).catch(function (e) { alert(e.message || "انجام نشد"); });
+    });
+    box.insertBefore(b, box.firstChild);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", addBlockBtn); else addBlockBtn();
+})();
+</script>
 </body></html>
