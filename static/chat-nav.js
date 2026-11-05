@@ -104,7 +104,8 @@
         add(t("درباره ما"), () => { location.href = "/about#about"; });
         add(t("پشتیبانی"), () => { location.href = "/support#support"; });
         add(t("خروج"), () => C.confirmSheet("مطمئنی می‌خوای از حساب خارج بشی؟", "خروج", () => { location.href = lo ? lo.getAttribute("href") : "/logout"; }));
-        C.sheet("منو", box, [{label: "بستن"}]);
+        const ver = document.createElement("small"); ver.textContent = "نسخه برنامه: r10"; ver.style.cssText = "opacity:.5;text-align:center;margin-top:4px"; box.appendChild(ver);
+                C.sheet("منو", box, [{label: "بستن"}]);
       });
 
       /* stories row */
