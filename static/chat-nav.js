@@ -86,10 +86,24 @@
         const inst = document.querySelector("[data-install-btn]"); if (inst && !inst.hidden) add(t("نصب برنامه"), () => inst.click());
         add(t("پس‌زمینه من"), () => { const b = $("open-my-background"); b ? b.click() : window.CRTheme && window.CRTheme.openPicker && window.CRTheme.openPicker(); });
         const lo = document.querySelector('.side-nav a[href*="logout"]');
-        add(t("زبان"), () => { location.href = "/lang?next=" + encodeURIComponent(location.pathname + location.search); });
+        add(t("زبان"), () => {   // medium in-page window instead of the separate language page
+          const LANGS = [["fa", "فارسی"], ["en", "English"], ["ar", "العربية"], ["tr", "Türkçe"], ["ru", "Русский"], ["es", "Español"], ["fr", "Français"], ["zh", "中文"]];
+          const cur = window.CR_LANG || (document.documentElement.lang || "fa").slice(0, 2), lb = document.createElement("div"); lb.className = "tg-menu";
+          LANGS.forEach(([code, name]) => {
+            const b = document.createElement("button"); b.type = "button"; b.className = "key" + (code === cur ? " hot" : ""); b.setAttribute("data-no-i18n", ""); b.textContent = (code === cur ? "✓  " : "") + name;
+            b.onclick = async () => {
+              if (code === cur) return C.hideModal("sheet");
+              b.disabled = true;
+              try { await fetch("/lang/" + code + "?next=%2Fchat", {credentials: "same-origin"}); } catch (_) {}
+              location.reload();
+            };
+            lb.appendChild(b);
+          });
+          C.sheet("زبان", lb, [{label: "بستن"}]);
+        });
         add(t("درباره ما"), () => { location.href = "/about#about"; });
         add(t("پشتیبانی"), () => { location.href = "/support#support"; });
-        add(t("خروج"), () => { location.href = lo ? lo.getAttribute("href") : "/logout"; });
+        add(t("خروج"), () => C.confirmSheet("مطمئنی می‌خوای از حساب خارج بشی؟", "خروج", () => { location.href = lo ? lo.getAttribute("href") : "/logout"; }));
         C.sheet("منو", box, [{label: "بستن"}]);
       });
 
