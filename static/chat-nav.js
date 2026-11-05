@@ -234,7 +234,7 @@
         row.addEventListener("click", e => {
           const a = e.target.closest("[data-act]");
           if (a && a.dataset.act === "info") return C.openUserProfile(c.username);
-          if (a && a.dataset.act === "del") return C.confirmSheet("«" + nameOf(c) + "» از مخاطبین حذف شود؟", "حذف", async () => {
+          if (a && a.dataset.act === "del") return C.confirmSheet(t("حذف این مخاطب؟") + " «" + nameOf(c) + "»", "حذف", async () => {
             const d = await api("/api/contacts/" + encodeURIComponent(c.username), {method: "DELETE"}); if (d) { contacts = d.contacts; renderContacts(); }
           });
           setTab("chats"); C.startDm(c.username);
