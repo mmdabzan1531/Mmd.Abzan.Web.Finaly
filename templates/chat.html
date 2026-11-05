@@ -97,51 +97,29 @@ window.CHATROOM = {
 <script src="{{ url_for('static', filename='chat-nav.js') }}?v={{ ASSET_V }}"></script>
 <script src="{{ url_for('static', filename='stories.js') }}?v={{ ASSET_V }}"></script>
 <script>
-/* privacy dialog (self-contained) */
+/* privacy panel (self-contained) */
 (function () {
   "use strict";
-  var ITEMS = [
-    ["بخش: چه چیزهایی دیده شود", null],
-    ["show_online", "آنلاین بودن", "دیگران ببینند الان آنلاین هستی"],
-    ["show_avatar", "عکس پروفایل", "عکس و ایموجی پروفایلت برای دیگران دیده شود"],
-    ["show_bio", "بیو", "بیوی پروفایل برای دیگران دیده شود"],
-    ["show_phone", "شماره موبایل", "شماره‌ات در پروفایل نمایش داده شود"],
-    ["show_email", "ایمیل", "ایمیلت در پروفایل نمایش داده شود"],
-    ["show_birthday", "تاریخ تولد", "تاریخ تولدت در پروفایل نمایش داده شود"],
-    ["بخش: ارتباط با تو", null],
-    ["allow_dm", "پیام از همه", "اگر خاموش باشد فقط مخاطبین تو می‌توانند پیام خصوصی بدهند"],
-    ["searchable", "پیدا شدن در جستجو", "دیگران با جستجوی نام یا نام‌کاربری پیدایت کنند"]
-  ];
+  var FA = "۰۱۲۳۴۵۶۷۸۹";
+  function fa(n) { return String(n).replace(/\d/g, function (d) { return FA[d]; }); }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  function $(sel, el) { return (el || document).querySelector(sel); }
+
+  var PRIV = {}, COUNTS = {blocked: 0, close_friends: 0, hide_story: 0};
+  var root, view, stack = [], navBusy = false, saving = {};
   var PROFILE_CB = {show_phone: "profile-show-phone", show_email: "profile-show-email", show_birthday: "profile-show-birthday"};
-  var root, state = {}, busy = {};
+  var DM_LABEL = {everyone: "همه", contacts: "فقط مخاطبین", nobody: "هیچ‌کس"};
 
-  function css() {
-    if (document.getElementById("pv-css")) return;
-    var s = document.createElement("style"); s.id = "pv-css";
-    s.textContent =
-      "#pv-ov{position:fixed;inset:0;z-index:99998;background:rgba(20,16,24,.55);display:flex;align-items:center;justify-content:center;padding:14px}" +
-      "#pv-ov[hidden]{display:none}" +
-      "#pv-card{background:var(--card,#fff);color:var(--ink,#3b1f2b);width:100%;max-width:460px;max-height:92vh;overflow:auto;border-radius:28px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-family:inherit}" +
-      "#pv-card h2{margin:0 0 6px;font-size:26px}#pv-card .pv-sub{margin:0 0 10px;font-size:14px;opacity:.75;line-height:1.7}" +
-      "#pv-card h4{margin:16px 0 2px;font-size:13px;opacity:.6;font-weight:700}" +
-      ".pv-row{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid rgba(160,90,120,.18);cursor:pointer}" +
-      ".pv-row:last-of-type{border-bottom:0}.pv-txt{flex:1;min-width:0}.pv-txt b{display:block;font-size:16px}.pv-txt small{display:block;opacity:.7;font-size:13px;margin-top:3px;line-height:1.6}" +
-      ".pv-sw{appearance:none;-webkit-appearance:none;flex:none;width:50px;height:30px;border-radius:30px;background:#c9c2c6;position:relative;transition:.2s;outline:0;cursor:pointer;margin:0}" +
-      ".pv-sw:after{content:'';position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}" +
-      ".pv-sw:checked{background:var(--accent,#d6456e)}.pv-sw:checked:after{right:23px}.pv-sw:disabled{opacity:.5}" +
-      ".pv-blk{display:flex;align-items:center;gap:10px;padding:9px 4px}.pv-blk span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
-      ".pv-btn{border:0;border-radius:16px;padding:9px 16px;background:#f9dbe4;color:#7a2845;font:inherit;font-weight:700;cursor:pointer}" +
-      ".pv-add{display:flex;gap:8px;margin-top:6px}.pv-add input{flex:1;min-width:0;border:1px solid rgba(160,90,120,.35);border-radius:14px;padding:9px 12px;font:inherit;background:transparent;color:inherit}" +
-      "#pv-st{min-height:20px;margin:10px 0 0;font-size:13px;text-align:center}.pv-foot{display:flex;justify-content:flex-start;margin-top:12px}";
-    document.head.appendChild(s);
-  }
+  var LISTS = {
+    blocked:       {title: "مسدودشده‌ها", btn: "رفع مسدودی", addBtn: "مسدود", empty: "کسی را مسدود نکرده‌ای.", hint: "کاربر مسدودشده نمی‌تواند پیام بدهد، تو را در جستجو ببیند یا استوری‌هایت را ببیند.",
+                    get: "/api/blocked", set: function (u, add) { return api("/api/block", "POST", {username: u, block: add}); }},
+    close_friends: {title: "دوستان نزدیک", btn: "حذف", addBtn: "افزودن", empty: "هنوز کسی را به دوستان نزدیک اضافه نکرده‌ای.", hint: "استوری‌هایی که برای «دوستان نزدیک» منتشر کنی فقط این افراد می‌بینند.",
+                    get: "/api/privacy/list/close_friends", set: function (u, add) { return api("/api/privacy/list/close_friends", "POST", {username: u, add: add}); }},
+    hide_story:    {title: "پنهان کردن استوری", btn: "نمایش دوباره", addBtn: "پنهان کن", empty: "استوری‌هایت را از کسی پنهان نکرده‌ای.", hint: "این افراد استوری‌های تو را نمی‌بینند و متوجه این موضوع نمی‌شوند.",
+                    get: "/api/privacy/list/hide_story", set: function (u, add) { return api("/api/privacy/list/hide_story", "POST", {username: u, add: add}); }}
+  };
 
-  function st(msg, bad) {
-    var e = document.getElementById("pv-st"); if (!e) return;
-    e.textContent = msg || ""; e.style.color = bad ? "#c0392b" : "#2e7d4f";
-    clearTimeout(st.t); if (msg) st.t = setTimeout(function () { e.textContent = ""; }, 2200);
-  }
-
+  /* ---------- helpers ---------- */
   function api(url, method, body) {
     var o = {method: method || "GET", credentials: "same-origin", headers: {"Accept": "application/json"}};
     if (body !== undefined) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(body); }
@@ -151,104 +129,303 @@ window.CHATROOM = {
       });
     });
   }
+  function toast(msg, bad) {
+    var t = $("#pv-toast"); if (!t) return;
+    t.textContent = msg; t.className = "show" + (bad ? " bad" : "");
+    clearTimeout(toast.t); toast.t = setTimeout(function () { t.className = ""; }, 2200);
+  }
+  function syncProfileForm() {
+    Object.keys(PROFILE_CB).forEach(function (k) { var c = document.getElementById(PROFILE_CB[k]); if (c && k in PRIV) c.checked = !!PRIV[k]; });
+    try { if (window.CHATROOM && window.CHATROOM.me) Object.keys(PRIV).forEach(function (k) { window.CHATROOM.me[k] = PRIV[k]; }); } catch (e) {}
+  }
+  function avatar(u) {
+    return '<div class="pv-av">' + (u.avatar_url ? '<img src="' + esc(u.avatar_url) + '" alt="">' : esc(u.avatar || "🙂")) + "</div>";
+  }
+  function icon(bg, em) { return '<span class="pv-ic" style="background:' + bg + '">' + em + "</span>"; }
 
-  function syncProfileForm(p) {
-    Object.keys(PROFILE_CB).forEach(function (k) {
-      var c = document.getElementById(PROFILE_CB[k]); if (c && k in p) c.checked = !!p[k];
-    });
-    try { if (window.CHATROOM && window.CHATROOM.me) Object.keys(p).forEach(function (k) { window.CHATROOM.me[k] = p[k]; }); } catch (e) {}
+  /* ---------- styles ---------- */
+  function css() {
+    if (document.getElementById("pv-css")) return;
+    var s = document.createElement("style"); s.id = "pv-css";
+    s.textContent = [
+      "#pv-ov{position:fixed;inset:0;z-index:99998;background:rgba(20,16,24,0);display:flex;align-items:center;justify-content:center;padding:12px;transition:background .3s;-webkit-tap-highlight-color:transparent}",
+      "#pv-ov.on{background:rgba(20,16,24,.55)}#pv-ov[hidden]{display:none}",
+      "#pv-card{position:relative;background:var(--card,#fff);color:var(--ink,#3b1f2b);width:100%;max-width:470px;height:min(88vh,700px);border-radius:30px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.4);font-family:inherit;transform:translateY(40px) scale(.94);opacity:0;transition:transform .42s cubic-bezier(.2,1.1,.3,1),opacity .25s}",
+      "#pv-ov.on #pv-card{transform:none;opacity:1}",
+      ".pv-pg{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:0 0 24px;background:inherit;transition:transform .38s cubic-bezier(.22,.9,.3,1),opacity .3s;will-change:transform}",
+      ".pv-pg.in-f{transform:translateX(-100%)}.pv-pg.in-b{transform:translateX(30%);opacity:.4}",
+      ".pv-pg.out-f{transform:translateX(30%);opacity:.4}.pv-pg.out-b{transform:translateX(-100%)}",
+      ".pv-hd{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;padding:16px 16px 10px;background:var(--card,#fff)}",
+      ".pv-hd h2{flex:1;margin:0;font-size:22px}.pv-ib{border:0;background:rgba(160,90,120,.12);color:inherit;width:38px;height:38px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .15s,background .2s}",
+      ".pv-ib:active{transform:scale(.88)}.pv-ib.rot{transform:rotate(45deg);background:rgba(214,69,110,.18)}",
+      ".pv-sec{margin:14px 18px 4px;font-size:13px;font-weight:700;opacity:.6}.pv-note{margin:6px 20px 10px;font-size:13px;line-height:1.8;opacity:.7}",
+      ".pv-grp{margin:0 12px;border-radius:22px;background:rgba(214,69,110,.06);overflow:hidden}",
+      ".pv-row{display:flex;align-items:center;gap:13px;padding:13px 14px;cursor:pointer;position:relative;transition:background .18s,transform .15s;user-select:none}",
+      ".pv-row:active{background:rgba(214,69,110,.12)}.pv-row+.pv-row:before{content:'';position:absolute;top:0;inset-inline:14px;height:1px;background:rgba(160,90,120,.16)}",
+      ".pv-ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:19px;color:#fff;filter:saturate(1.1)}",
+      ".pv-tx{flex:1;min-width:0}.pv-tx b{display:block;font-size:15.5px}.pv-tx small{display:block;margin-top:2px;font-size:12.5px;line-height:1.7;opacity:.68}",
+      ".pv-val{font-size:13.5px;opacity:.65;white-space:nowrap}.pv-chev{opacity:.4;font-size:22px;line-height:1;transform:translateY(-1px)}",
+      ".pv-row.shake{animation:pvshake .4s}@keyframes pvshake{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}",
+      /* ---- animated switch ---- */
+      ".pv-sw{flex:none;position:relative;width:56px;height:32px;display:block;margin:0}.pv-sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:2;width:100%;height:100%}",
+      ".pv-tr{position:absolute;inset:0;border-radius:32px;background:#cfc6cb;transition:background .35s,box-shadow .35s;box-shadow:inset 0 0 0 0 rgba(0,0,0,.0)}",
+      ".pv-th{position:absolute;top:3px;right:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:grid;place-items:center;transition:right .42s cubic-bezier(.34,1.56,.64,1),width .2s,transform .3s}",
+      ".pv-th svg{position:absolute;width:15px;height:15px;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .25s}",
+      ".pv-th .k{opacity:0;transform:scale(.2) rotate(-90deg);stroke:var(--accent,#d6456e)}.pv-th .x{opacity:1;stroke:#9b8f95}",
+      ".pv-sw input:active~.pv-th{width:34px}.pv-sw input:checked:active~.pv-th{width:34px}",
+      ".pv-sw input:checked~.pv-tr{background:var(--accent,#d6456e);box-shadow:0 0 18px rgba(214,69,110,.45)}",
+      ".pv-sw input:checked~.pv-th{right:calc(100% - 29px)}",
+      ".pv-sw input:checked~.pv-th .k{opacity:1;transform:none}.pv-sw input:checked~.pv-th .x{opacity:0;transform:scale(.2) rotate(90deg)}",
+      ".pv-sw input:disabled{cursor:progress}.pv-sw.busy .pv-th{animation:pvpulse .8s infinite}@keyframes pvpulse{50%{transform:scale(.82)}}",
+      ".pv-sw:after{content:'';position:absolute;inset:-2px;border-radius:34px;pointer-events:none;border:2px solid var(--accent,#d6456e);opacity:0}",
+      ".pv-sw.pop:after{animation:pvring .55s ease-out}@keyframes pvring{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(1.35,1.9)}}",
+      /* ---- radio ---- */
+      ".pv-rd{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid #b9aeb4;position:relative;transition:border-color .25s}",
+      ".pv-rd:after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--accent,#d6456e);transform:scale(0);transition:transform .35s cubic-bezier(.34,1.8,.64,1)}",
+      ".pv-row.sel .pv-rd{border-color:var(--accent,#d6456e)}.pv-row.sel .pv-rd:after{transform:scale(1)}",
+      /* ---- user rows ---- */
+      ".pv-av{flex:none;width:46px;height:46px;border-radius:50%;background:rgba(214,69,110,.14);display:grid;place-items:center;font-size:24px;overflow:hidden}.pv-av img{width:100%;height:100%;object-fit:cover}",
+      ".pv-u{display:flex;align-items:center;gap:12px;padding:8px 18px;max-height:80px;overflow:hidden;transition:max-height .35s,opacity .3s,transform .35s,padding .35s}",
+      ".pv-u.gone{max-height:0;opacity:0;transform:translateX(60px);padding-top:0;padding-bottom:0}.pv-u.new{animation:pvin .45s cubic-bezier(.2,1.2,.3,1)}@keyframes pvin{from{opacity:0;transform:translateY(-14px) scale(.96)}}",
+      ".pv-u .pv-tx small{direction:ltr;text-align:right}",
+      ".pv-btn{flex:none;border:0;border-radius:14px;padding:9px 15px;background:var(--accent,#d6456e);color:#fff;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;transition:transform .15s,opacity .2s}",
+      ".pv-btn:active{transform:scale(.92)}.pv-btn.sec{background:rgba(214,69,110,.14);color:var(--accent,#d6456e)}.pv-btn:disabled{opacity:.5}",
+      ".pv-addp{overflow:hidden;max-height:0;opacity:0;transition:max-height .4s ease,opacity .3s;padding:0 18px}.pv-addp.open{max-height:520px;opacity:1;padding:4px 18px 8px}",
+      ".pv-addp input{width:100%;box-sizing:border-box;border:1.5px solid rgba(160,90,120,.35);border-radius:16px;padding:11px 14px;font:inherit;background:transparent;color:inherit;outline:0;transition:border-color .2s,box-shadow .2s}",
+      ".pv-addp input:focus{border-color:var(--accent,#d6456e);box-shadow:0 0 0 4px rgba(214,69,110,.14)}",
+      ".pv-emp{text-align:center;padding:34px 24px;opacity:.6;font-size:14px;line-height:1.9}.pv-emp i{display:block;font-style:normal;font-size:40px;margin-bottom:6px;animation:pvfloat 2.6s ease-in-out infinite}@keyframes pvfloat{50%{transform:translateY(-6px)}}",
+      "#pv-toast{position:absolute;bottom:18px;left:50%;transform:translate(-50%,30px);opacity:0;background:#2b1a22;color:#fff;padding:10px 18px;border-radius:30px;font-size:13.5px;z-index:9;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.2,.3,1),opacity .25s;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}",
+      "#pv-toast.show{opacity:1;transform:translate(-50%,0)}#pv-toast.bad{background:#b3261e}",
+      ".pv-sk{height:56px;margin:8px 18px;border-radius:16px;background:linear-gradient(90deg,rgba(160,90,120,.08),rgba(160,90,120,.18),rgba(160,90,120,.08));background-size:200% 100%;animation:pvsk 1.2s infinite}@keyframes pvsk{to{background-position:-200% 0}}",
+      "@media (prefers-reduced-motion:reduce){#pv-card *,#pv-card{transition-duration:.01s!important;animation:none!important}}"
+    ].join("\n");
+    document.head.appendChild(s);
   }
 
-  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  /* ---------- building blocks ---------- */
+  var SVG_K = '<svg class="k" viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var SVG_X = '<svg class="x" viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+  function sw(key, on) {
+    return '<label class="pv-sw" data-sw="' + key + '"><input type="checkbox" data-k="' + key + '"' + (on ? " checked" : "") + '><span class="pv-tr"></span><span class="pv-th">' + SVG_K + SVG_X + "</span></label>";
+  }
+  function swRow(key, ic, bg, title, desc) {
+    return '<div class="pv-row" data-row="' + key + '">' + icon(bg, ic) + '<div class="pv-tx"><b>' + esc(title) + "</b>" + (desc ? "<small>" + esc(desc) + "</small>" : "") + "</div>" + sw(key, PRIV[key]) + "</div>";
+  }
+  function navRow(go, ic, bg, title, val) {
+    return '<div class="pv-row" data-go="' + go + '">' + icon(bg, ic) + '<div class="pv-tx"><b>' + esc(title) + '</b></div><span class="pv-val" data-val="' + go + '">' + esc(val || "") + '</span><span class="pv-chev">‹</span></div>';
+  }
+  function header(title, back, extra) {
+    return '<div class="pv-hd">' + (back ? '<button type="button" class="pv-ib" data-back aria-label="بازگشت">›</button>' : "") + "<h2>" + esc(title) + "</h2>" + (extra || "") +
+      (back ? "" : '<button type="button" class="pv-ib" data-close aria-label="بستن">✕</button>') + "</div>";
+  }
 
+  /* ---------- pages ---------- */
+  var PAGES = {
+    main: function () {
+      return header("حریم خصوصی", false) +
+        '<div class="pv-sec">چه کسی محتوای تو را می‌بیند</div><div class="pv-grp">' +
+        swRow("private_account", "🔒", "#5aa86b", "حساب خصوصی", "فقط مخاطبینت استوری‌هایت را می‌بینند و در جستجو پیدا نمی‌شوی") +
+        navRow("close_friends", "⭐", "#e6b43c", "دوستان نزدیک", fa(COUNTS.close_friends)) +
+        navRow("blocked", "🚫", "#d4574c", "مسدودشده‌ها", fa(COUNTS.blocked)) +
+        navRow("hide_story", "🙈", "#8a5bc9", "پنهان کردن استوری", fa(COUNTS.hide_story)) +
+        navRow("profile", "👤", "#4a86dc", "اطلاعات پروفایل", "") + "</div>" +
+        '<div class="pv-sec">تعامل دیگران با تو</div><div class="pv-grp">' +
+        navRow("messages", "💬", "#dc9b3f", "پیام‌های خصوصی", DM_LABEL[PRIV.dm_from] || "") + "</div>" +
+        '<div class="pv-sec">وضعیت آنلاین</div><div class="pv-grp">' +
+        swRow("show_online", "🟢", "#3aa9a0", "نمایش وضعیت فعالیت", "دیگران ببینند الان آنلاین هستی") + "</div>";
+    },
+    profile: function () {
+      return header("اطلاعات پروفایل", true) + '<p class="pv-note">انتخاب کن دیگران کدام بخش‌های پروفایلت را ببینند. تغییرات همان لحظه ذخیره می‌شود.</p><div class="pv-grp">' +
+        swRow("show_avatar", "🖼", "#4a86dc", "عکس پروفایل", "عکس و ایموجی پروفایلت دیده شود") +
+        swRow("show_bio", "📝", "#7a8fa6", "بیو", "بیوی پروفایل برای دیگران دیده شود") +
+        swRow("show_phone", "📞", "#5aa86b", "شماره موبایل", "شماره‌ات در پروفایل نمایش داده شود") +
+        swRow("show_email", "✉️", "#dc9b3f", "ایمیل", "ایمیلت در پروفایل نمایش داده شود") +
+        swRow("show_birthday", "🎂", "#d4574c", "تاریخ تولد", "تاریخ تولدت در پروفایل نمایش داده شود") +
+        swRow("searchable", "🔎", "#8a5bc9", "پیدا شدن در جستجو", "دیگران با جستجوی نام یا نام‌کاربری پیدایت کنند") + "</div>";
+    },
+    messages: function () {
+      function r(v, t, d) { return '<div class="pv-row' + (PRIV.dm_from === v ? " sel" : "") + '" data-dm="' + v + '"><div class="pv-tx"><b>' + t + "</b><small>" + d + '</small></div><span class="pv-rd"></span></div>'; }
+      return header("پیام‌های خصوصی", true) + '<p class="pv-note">انتخاب کن چه کسانی می‌توانند برای اولین بار به تو پیام خصوصی بدهند. گفتگوهایی که قبلاً شروع شده‌اند ادامه پیدا می‌کنند.</p><div class="pv-grp">' +
+        r("everyone", "همه", "هر کاربری می‌تواند پیام بدهد") +
+        r("contacts", "فقط مخاطبین", "فقط کسانی که در مخاطبین توان") +
+        r("nobody", "هیچ‌کس", "کسی نمی‌تواند گفتگوی جدید شروع کند") + "</div>";
+    }
+  };
+  function listPage(key) {
+    var L = LISTS[key];
+    return header(L.title, true, '<button type="button" class="pv-ib" data-plus aria-label="افزودن">+</button>') +
+      '<p class="pv-note">' + esc(L.hint) + '</p><div class="pv-addp" data-addp><input data-q dir="rtl" placeholder="جستجوی نام یا نام‌کاربری…" autocomplete="off" autocapitalize="off"><div data-res></div></div>' +
+      '<div data-list><div class="pv-sk"></div><div class="pv-sk"></div></div>';
+  }
+
+  /* ---------- navigation ---------- */
+  function render(name) {
+    var el = document.createElement("div"); el.className = "pv-pg"; el.dataset.page = name;
+    el.innerHTML = PAGES[name] ? PAGES[name]() : listPage(name);
+    return el;
+  }
+  function show(name, dir) {
+    var next = render(name), prev = $(".pv-pg:last-of-type", view);
+    prev = view.querySelector(".pv-pg:not(.leaving)");
+    if (!prev) { view.appendChild(next); bind(next, name); return; }
+    navBusy = true; prev.classList.add("leaving");
+    next.classList.add(dir > 0 ? "in-f" : "in-b"); view.appendChild(next); bind(next, name);
+    void next.offsetWidth;
+    next.classList.remove("in-f", "in-b"); prev.classList.add(dir > 0 ? "out-f" : "out-b");
+    setTimeout(function () { prev.remove(); navBusy = false; }, 400);
+  }
+  function go(name) { if (navBusy) return; stack.push(name); show(name, 1); }
+  function back() { if (navBusy || stack.length < 2) return; stack.pop(); show(stack[stack.length - 1], -1); }
+
+  /* ---------- page logic ---------- */
+  function bind(pg, name) {
+    if (LISTS[name]) initList(pg, name);
+  }
+
+  function setCountLabel(key) {
+    var v = document.querySelector('[data-val="' + key + '"]'); if (v) v.textContent = fa(COUNTS[key]);
+  }
+
+  function userRow(u, key, mode) {
+    var el = document.createElement("div"); el.className = "pv-u new"; el.dataset.u = u.username;
+    el.innerHTML = avatar(u) + '<div class="pv-tx"><b>' + esc(u.display_name || u.username) + "</b><small>@" + esc(u.username) + '</small></div><button type="button" class="pv-btn' + (mode === "add" ? "" : " sec") + '">' + esc(mode === "add" ? LISTS[key].addBtn : LISTS[key].btn) + "</button>";
+    return el;
+  }
+
+  function initList(pg, key) {
+    var L = LISTS[key], listEl = $("[data-list]", pg), addp = $("[data-addp]", pg), q = $("[data-q]", pg), res = $("[data-res]", pg);
+    var members = {}, contacts = null, timer;
+
+    function empty() {
+      if (!listEl.querySelector(".pv-u")) listEl.innerHTML = '<div class="pv-emp"><i>' + (key === "blocked" ? "🚫" : key === "close_friends" ? "⭐" : "🙈") + "</i>" + esc(L.empty) + "</div>";
+    }
+    function paint(users) {
+      members = {}; listEl.innerHTML = "";
+      users.forEach(function (u) { members[u.username] = 1; var r = userRow(u, key, "rm"); r.classList.remove("new"); listEl.appendChild(r); });
+      COUNTS[key] = users.length; setCountLabel(key); empty();
+    }
+    function load() {
+      api(L.get).then(function (j) { paint(j.users || []); }).catch(function (e) { listEl.innerHTML = '<div class="pv-emp">' + esc(e.message) + "</div>"; });
+    }
+    function suggestions(users) {
+      users = users.filter(function (u) { return !members[u.username]; }).slice(0, 12);
+      res.innerHTML = ""; if (!users.length) { res.innerHTML = '<div class="pv-emp" style="padding:14px">نتیجه‌ای پیدا نشد.</div>'; return; }
+      users.forEach(function (u) { res.appendChild(userRow(u, key, "add")); });
+    }
+    function showContacts() {
+      var go2 = function (c) { suggestions(c); };
+      if (contacts) return go2(contacts);
+      api("/api/contacts").then(function (j) {
+        contacts = (j.contacts || []).map(function (c) { var u = c.user || {}; return {username: c.username, display_name: c.name || u.display_name, avatar: u.avatar, avatar_url: u.avatar_url}; });
+        go2(contacts);
+      }).catch(function () { res.innerHTML = ""; });
+    }
+
+    $("[data-plus]", pg).addEventListener("click", function () {
+      var open = addp.classList.toggle("open"); this.classList.toggle("rot", open);
+      if (open) { showContacts(); setTimeout(function () { q.focus(); }, 300); } else { q.value = ""; res.innerHTML = ""; }
+    });
+    q.addEventListener("input", function () {
+      clearTimeout(timer); var v = q.value.trim().replace(/^@/, "");
+      if (v.length < 2) { return showContacts(); }
+      timer = setTimeout(function () {
+        api("/api/users/search?q=" + encodeURIComponent(v)).then(function (j) { suggestions(j.users || []); }).catch(function () {});
+      }, 280);
+    });
+    pg.addEventListener("click", function (e) {
+      var b = e.target.closest(".pv-u .pv-btn"); if (!b) return;
+      var row = b.closest(".pv-u"), u = row.dataset.u, adding = !members[u] && row.parentNode === res;
+      b.disabled = true;
+      L.set(u, adding).then(function () {
+        if (adding) {
+          members[u] = 1; row.classList.add("gone");
+          var name = (row.querySelector("b") || {}).textContent;
+          setTimeout(function () { row.remove(); }, 350);
+          var existing = listEl.querySelector(".pv-emp"); if (existing) existing.remove();
+          var r = userRow({username: u, display_name: name, avatar_url: (row.querySelector("img") || {}).src, avatar: (row.querySelector(".pv-av") || {}).textContent}, key, "rm");
+          listEl.insertBefore(r, listEl.firstChild); COUNTS[key]++; toast("اضافه شد ✓");
+        } else {
+          delete members[u]; row.classList.add("gone"); COUNTS[key] = Math.max(0, COUNTS[key] - 1);
+          setTimeout(function () { row.remove(); empty(); }, 360); toast(key === "blocked" ? "از حالت مسدود درآمد" : "حذف شد");
+        }
+        setCountLabel(key);
+      }).catch(function (err) { b.disabled = false; toast(err.message || "انجام نشد", true); });
+    });
+    load();
+  }
+
+  /* ---------- global delegated events ---------- */
+  function onClick(e) {
+    var t = e.target;
+    if (t === root || t.closest("[data-close]")) { if (t === root || t.closest("[data-close]")) return close(); }
+    if (t.closest("[data-back]")) return back();
+    var dm = t.closest("[data-dm]");
+    if (dm) return setDm(dm);
+    var g = t.closest("[data-go]"); if (g) return go(g.dataset.go);
+    var row = t.closest(".pv-row[data-row]");
+    if (row && !t.closest(".pv-sw")) { var inp = row.querySelector("input"); if (inp && !inp.disabled) inp.click(); }
+  }
+
+  function setDm(rowEl) {
+    var v = rowEl.dataset.dm; if (v === PRIV.dm_from || saving.dm_from) return;
+    var old = PRIV.dm_from; saving.dm_from = 1;
+    rowEl.parentNode.querySelectorAll(".pv-row").forEach(function (r) { r.classList.toggle("sel", r === rowEl); });
+    PRIV.dm_from = v;
+    api("/api/privacy", "POST", {dm_from: v}).then(function (j) { PRIV = j.privacy; toast("ذخیره شد ✓"); })
+      .catch(function (err) {
+        PRIV.dm_from = old; toast(err.message || "ذخیره نشد", true);
+        rowEl.parentNode.querySelectorAll(".pv-row").forEach(function (r) { r.classList.toggle("sel", r.dataset.dm === old); });
+      }).then(function () { saving.dm_from = 0; });
+  }
+
+  function onChange(e) {
+    var cb = e.target; if (!cb.matches || !cb.matches("input[data-k]")) return;
+    var k = cb.dataset.k, want = cb.checked, label = cb.closest(".pv-sw"), row = cb.closest(".pv-row");
+    if (saving[k]) { cb.checked = !want; return; }
+    saving[k] = 1; cb.disabled = true; label.classList.add("busy");
+    label.classList.remove("pop"); void label.offsetWidth; label.classList.add("pop");
+    var body = {}; body[k] = want;
+    api("/api/privacy", "POST", body).then(function (j) {
+      PRIV = j.privacy || PRIV; COUNTS = j.counts || COUNTS; cb.checked = !!PRIV[k]; syncProfileForm();
+      toast(want ? "فعال شد ✓" : "غیرفعال شد");
+    }).catch(function (err) {
+      cb.checked = !want; row.classList.remove("shake"); void row.offsetWidth; row.classList.add("shake"); toast(err.message || "ذخیره نشد", true);
+    }).then(function () { saving[k] = 0; cb.disabled = false; label.classList.remove("busy"); });
+  }
+
+  /* ---------- open / close ---------- */
   function build() {
     css();
     if (root) root.remove();
     root = document.createElement("div"); root.id = "pv-ov"; root.hidden = true; root.dir = "rtl";
-    var h = '<section id="pv-card" role="dialog" aria-modal="true" aria-label="حریم خصوصی"><h2>حریم خصوصی</h2>' +
-      '<p class="pv-sub">انتخاب کن دیگران چه چیزهایی از تو ببینند. تغییرات همان لحظه ذخیره می‌شود.</p>';
-    ITEMS.forEach(function (it) {
-      if (it[1] === null) { h += "<h4>" + esc(it[0].replace("بخش: ", "")) + "</h4>"; return; }
-      h += '<label class="pv-row"><div class="pv-txt"><b>' + esc(it[1]) + "</b><small>" + esc(it[2]) +
-           '</small></div><input type="checkbox" class="pv-sw" data-k="' + it[0] + '"></label>';
-    });
-    h += '<h4>کاربران مسدودشده</h4><div id="pv-blocked"><small style="opacity:.6">در حال بارگذاری…</small></div>' +
-      '<div class="pv-add"><input id="pv-block-in" dir="ltr" placeholder="نام‌کاربری برای مسدود کردن" autocomplete="off" autocapitalize="off"><button type="button" class="pv-btn" id="pv-block-btn">مسدود</button></div>' +
-      '<p id="pv-st" role="status"></p><div class="pv-foot"><button type="button" class="pv-btn" id="pv-close">بستن</button></div></section>';
-    root.innerHTML = h;
-    document.body.appendChild(root);
-
-    root.addEventListener("click", function (e) { if (e.target === root) close(); });
-    root.querySelector("#pv-close").addEventListener("click", close);
-    root.querySelectorAll(".pv-sw").forEach(function (cb) { cb.addEventListener("change", onToggle); });
-    root.querySelector("#pv-block-btn").addEventListener("click", function () {
-      var inp = root.querySelector("#pv-block-in"), u = inp.value.trim().replace(/^@/, "");
-      if (u) block(u, true).then(function (ok) { if (ok) inp.value = ""; });
-    });
-    root.querySelector("#pv-block-in").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); root.querySelector("#pv-block-btn").click(); }
-    });
-    root.querySelector("#pv-blocked").addEventListener("click", function (e) {
-      var b = e.target.closest("[data-unblock]"); if (b) block(b.getAttribute("data-unblock"), false);
-    });
+    root.innerHTML = '<section id="pv-card" role="dialog" aria-modal="true" aria-label="حریم خصوصی"><div id="pv-view"></div><div id="pv-toast" role="status"></div></section>';
+    document.body.appendChild(root); view = $("#pv-view", root);
+    root.addEventListener("click", onClick); root.addEventListener("change", onChange);
   }
-
-  function onToggle(e) {
-    var cb = e.target, k = cb.getAttribute("data-k"), want = cb.checked;
-    if (busy[k]) { cb.checked = !want; return; }
-    busy[k] = true; cb.disabled = true;
-    var body = {}; body[k] = want;
-    api("/api/privacy", "POST", body).then(function (j) {
-      state = j.privacy || state; cb.checked = !!state[k]; syncProfileForm(state); st("ذخیره شد ✓");
-    }).catch(function (err) { cb.checked = !want; st(err.message || "ذخیره نشد", true); })
-      .then(function () { busy[k] = false; cb.disabled = false; });
-  }
-
-  function renderBlocked(list) {
-    var box = root.querySelector("#pv-blocked");
-    if (!list.length) { box.innerHTML = '<small style="opacity:.6">کسی را مسدود نکرده‌ای.</small>'; return; }
-    box.innerHTML = list.map(function (u) {
-      return '<div class="pv-blk"><span>' + esc(u.avatar || "🙂") + " " + esc(u.display_name || u.username) +
-        ' <small dir="ltr" style="opacity:.6">@' + esc(u.username) + '</small></span><button type="button" class="pv-btn" data-unblock="' +
-        esc(u.username) + '">رفع مسدودی</button></div>';
-    }).join("");
-  }
-
-  function loadBlocked() {
-    return api("/api/blocked").then(function (j) { renderBlocked(j.users || []); })
-      .catch(function (e) { root.querySelector("#pv-blocked").innerHTML = '<small style="color:#c0392b">' + esc(e.message) + "</small>"; });
-  }
-
-  function block(u, yes) {
-    return api("/api/block", "POST", {username: u, block: yes}).then(function () {
-      st(yes ? "مسدود شد" : "از حالت مسدود درآمد"); return loadBlocked().then(function () { return true; });
-    }).catch(function (e) { st(e.message || "انجام نشد", true); return false; });
-  }
-
   function open() {
     if (!root || !document.body.contains(root)) build();
-    root.hidden = false; document.documentElement.style.overflow = "hidden";
-    root.querySelectorAll(".pv-sw").forEach(function (cb) { cb.disabled = true; });
+    view.innerHTML = '<div class="pv-pg"><div class="pv-hd"><h2>حریم خصوصی</h2></div><div class="pv-sk"></div><div class="pv-sk"></div><div class="pv-sk"></div></div>';
+    stack = ["main"]; navBusy = false;
+    root.hidden = false; void root.offsetWidth; root.classList.add("on"); document.documentElement.style.overflow = "hidden";
     api("/api/privacy").then(function (j) {
-      state = j.privacy || {};
-      root.querySelectorAll(".pv-sw").forEach(function (cb) { cb.checked = !!state[cb.getAttribute("data-k")]; cb.disabled = false; });
-      syncProfileForm(state);
-    }).catch(function (e) { st(e.message || "بارگذاری نشد", true); });
-    loadBlocked();
+      PRIV = j.privacy || {}; COUNTS = j.counts || COUNTS; syncProfileForm();
+      view.innerHTML = ""; view.appendChild(render("main"));
+    }).catch(function (e) { view.innerHTML = '<div class="pv-pg"><div class="pv-emp"><i>⚠️</i>' + esc(e.message || "بارگذاری نشد") + "</div></div>"; });
   }
-  function close() { if (root) root.hidden = true; document.documentElement.style.overflow = ""; }
+  function close() {
+    if (!root) return; root.classList.remove("on"); document.documentElement.style.overflow = "";
+    setTimeout(function () { if (!root.classList.contains("on")) root.hidden = true; }, 330);
+  }
   window.openPrivacy = open;
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && root && !root.hidden) (stack.length > 1 ? back : close)(); });
 
-  /* take over the existing "حریم خصوصی" row in the settings list (capture phase beats the broken handler) */
+  /* take over the "حریم خصوصی" row of the settings list */
   document.addEventListener("click", function (e) {
     if (root && root.contains(e.target)) return;
     var el = e.target;
     for (var i = 0; el && el !== document.body && i < 7; i++, el = el.parentElement) {
       var t = (el.textContent || "").replace(/\s+/g, " ").trim();
-      if (t.indexOf("حریم خصوصی") === 0 && t.length < 90) {
-        if (el.closest(".modal.open, .modal.show, .modal[open]")) return;
-        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); open(); return;
-      }
+      if (t.indexOf("حریم خصوصی") === 0 && t.length < 90) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); open(); return; }
       if (t.length > 90) break;
     }
   }, true);
@@ -262,9 +439,7 @@ window.CHATROOM = {
       var u = (document.getElementById("view-user-id").textContent || "").replace(/^@/, "").trim(); if (!u) return;
       api("/api/blocked").then(function (j) {
         var was = (j.users || []).some(function (x) { return x.username === u; });
-        return api("/api/block", "POST", {username: u, block: !was}).then(function () {
-          alert(was ? "از حالت مسدود درآمد." : "کاربر مسدود شد.");
-        });
+        return api("/api/block", "POST", {username: u, block: !was}).then(function () { alert(was ? "از حالت مسدود درآمد." : "کاربر مسدود شد."); });
       }).catch(function (e) { alert(e.message || "انجام نشد"); });
     });
     box.insertBefore(b, box.firstChild);
