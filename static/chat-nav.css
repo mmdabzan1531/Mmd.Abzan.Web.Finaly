@@ -1,0 +1,26 @@
+/* Main five-tab bottom navigation for Chatroom */
+.chat-bottom-nav{position:fixed;z-index:100;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));min-height:64px;padding:6px 5px calc(6px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.96);border-top:1px solid rgba(20,20,30,.12);box-shadow:0 -5px 22px rgba(15,20,35,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);direction:rtl}
+.chat-bottom-nav .chat-nav-item{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:2px 1px;border:0;background:transparent;color:#777986;text-decoration:none;font:600 10px/1.25 inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.chat-bottom-nav .chat-nav-icon{height:27px;display:grid;place-items:center;font-size:23px;line-height:1}
+.chat-bottom-nav .chat-nav-item.is-active{color:#6754d9}
+.chat-bottom-nav .chat-nav-item:focus-visible{outline:2px solid #6754d9;outline-offset:-3px;border-radius:10px}
+.chat-bottom-nav .chat-nav-insta{color:#c13584;font-weight:800}
+.chat-bottom-nav .chat-nav-insta .insta-glyph{width:27px;height:27px;border-radius:9px;color:#fff;font-size:23px;background:linear-gradient(135deg,#833ab4 0%,#c13584 48%,#f77737 100%)}
+@media(prefers-color-scheme:dark){.chat-bottom-nav{background:rgba(24,24,29,.96);border-color:rgba(255,255,255,.12)}.chat-bottom-nav .chat-nav-item{color:#b5b5c0}.chat-bottom-nav .chat-nav-item.is-active{color:#b8aaff}.chat-bottom-nav .chat-nav-insta{color:#ff8ac2}}
+@media(min-width:800px){.chat-bottom-nav{left:50%;right:auto;transform:translateX(-50%);width:min(520px,100%);border:1px solid rgba(20,20,30,.12);border-bottom:0;border-radius:16px 16px 0 0}}
+body.chat-body{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))}
+@media(min-width:800px){body.chat-body{padding-bottom:0}}
+
+/* Chatroom header adjustments: keep the overflow menu beside the title.
+   Insta Mode remains a separate page and is not styled by these rules. */
+.chat-body .side-head.tg-head {
+  display: flex;
+  align-items: center;
+}
+.chat-body .side-head.tg-head > .tg-title {
+  min-width: 0;
+}
+.chat-body .side-head.tg-head > #tg-more {
+  flex: 0 0 auto;
+  margin-inline-start: 8px;
+}
