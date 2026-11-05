@@ -8,6 +8,8 @@
   var m = document.cookie.match(/(?:^|;\s*)lang=([a-z]{2})/);
   var lang = m && DIRS[m[1]] ? m[1] : "fa";
   window.CR_LANG = lang;
+  var LOCALES = { fa: "fa-IR", en: "en-US", ar: "ar-EG", tr: "tr-TR", ru: "ru-RU", es: "es-ES", fr: "fr-FR", zh: "zh-CN" };
+  window.CR_LOCALE = LOCALES[lang] || "fa-IR";                        // chat.js / auth.js format times & numbers with this
   window.t = function (s) { return s; };
   if (root.hasAttribute("data-keep-dir")) return;                     // the language picker page itself
   root.lang = lang;
@@ -35,6 +37,9 @@
   function one(n) {
     var h = EX[n];
     if (h && h[idx]) return h[idx];
+    if (/^[۰-۹+\-\s()]+$/.test(n)) return lang === "ar" ? n.replace(/[۰-۹]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 0x0660); }) : dg(n);   // phone numbers / counts: Latin digits (Arabic UI keeps its own)
+    var cp = n.match(/^© ?[۰-۹]+ Chatroom ·$/);                       // footer: Solar-Hijri year -> current Gregorian year
+    if (cp) return "© " + new Date().getFullYear() + " Chatroom ·";
     for (var i = 0; i < PX.length; i++) {
       var p = PX[i];
       if (p[1][idx] && n.indexOf(p[0]) === 0) return p[1][idx] + dg(n.slice(p[0].length));
@@ -100,9 +105,9 @@
   var ATTRS = ["placeholder", "title", "aria-label", "alt"];
   var done = new WeakMap();
 
-  function skipped(el) {
+  function skipped(el, attrMode) {                                   // attrMode: a <textarea>'s own placeholder/title is still translated
     for (; el && el.nodeType === 1; el = el.parentNode) {
-      if (el.nodeName === "SCRIPT" || el.nodeName === "STYLE" || el.nodeName === "TEXTAREA" ||
+      if (el.nodeName === "SCRIPT" || el.nodeName === "STYLE" || (el.nodeName === "TEXTAREA" && !attrMode) ||
           el.hasAttribute("data-no-i18n") || el.isContentEditable) return true;
     }
     return false;
@@ -118,7 +123,7 @@
       var v = el.getAttribute(ATTRS[i]);
       if (!v) continue;
       var o = tr(v);
-      if (o !== v && !skipped(el)) el.setAttribute(ATTRS[i], o);
+      if (o !== v && !skipped(el, true)) el.setAttribute(ATTRS[i], o);
     }
   }
   function walk(node) {
