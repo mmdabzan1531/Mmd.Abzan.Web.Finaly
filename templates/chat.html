@@ -98,6 +98,7 @@ window.CHATROOM = {
 <script src="{{ url_for('static', filename='stories.js') }}?v={{ ASSET_V }}"></script>
 <script>
 /* privacy panel (self-contained) */
+{% raw %}
 (function () {
   "use strict";
   var FA = "۰۱۲۳۴۵۶۷۸۹";
@@ -446,5 +447,7 @@ window.CHATROOM = {
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", addBlockBtn); else addBlockBtn();
 })();
+
+{% endraw %}
 </script>
 </body></html>
