@@ -425,8 +425,8 @@ window.CHATROOM = {
     var el = e.target;
     for (var i = 0; el && el !== document.body && i < 7; i++, el = el.parentElement) {
       var t = (el.textContent || "").replace(/\s+/g, " ").trim();
-      if (t.indexOf("حریم خصوصی") === 0 && t.length < 90) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); open(); return; }
-      if (t.length > 90) break;
+      if (t.indexOf("حریم خصوصی") !== -1 && t.length < 120 && !/^(بستن|✕)$/.test(t)) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); open(); return; }
+      if (t.length > 120) break;
     }
   }, true);
 
