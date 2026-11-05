@@ -36,10 +36,32 @@
       (actions || [{label: "بستن"}]).forEach(x => { const b = el("button", x.cls || "", esc(t(x.label))); b.type = "button"; b.onclick = () => { w.remove(); x.fn && x.fn(); }; a.appendChild(b); });
       c.appendChild(a); w.appendChild(c); w.addEventListener("click", e => { if (e.target === w) w.remove(); }); document.body.appendChild(w); return w;
     }
-    function openPremium() {
-      const b = el("div"); b.innerHTML = '<div class="st-star">⭐</div><p>' + esc(t("نمایش ۴۸ و ۷۲ ساعته فقط برای کاربران پریمیوم است.")) + "\n" + esc(t("برای فعال‌سازی پریمیوم با پشتیبانی در ارتباط باش.")) + "</p>";
-      dlg("پریمیوم", b, [{label: "پشتیبانی", cls: "hot", fn: () => { location.href = "/support#support"; }}, {label: "بستن"}]);
+    async function openPremium() {
+      let info = {};
+      try { const r = await fetch("/api/premium", {credentials: "same-origin"}); info = await r.json(); } catch (_) {}
+      const price = info.price ? Number(info.price).toLocaleString(LOC) + " " + t("تومان") : "", days = info.days ? Number(info.days).toLocaleString(LOC) : "";
+      const until = info.premium && info.until ? new Date(info.until * 1000).toLocaleDateString(LOC) : "";
+      const b = el("div");
+      b.innerHTML = '<div class="st-star">⭐</div><p>' + esc(t("نمایش ۴۸ و ۷۲ ساعته فقط برای کاربران پریمیوم است.")) + "</p>" +
+        (info.premium ? "<p><strong>" + esc(t("پریمیوم تو فعال است")) + (until ? " — " + esc(t("تا")) + " " + esc(until) : "") + "</strong></p>" : "") +
+        (price ? "<p><strong>" + esc(t("اشتراک")) + " " + esc(days) + " " + esc(t("روزه")) + " — " + esc(price) + "</strong></p>" : "");
+      dlg("پریمیوم", b, [{label: info.premium ? "تمدید" : "خرید پریمیوم", cls: "hot", fn: buyPremium}, {label: "بستن"}]);
     }
+    async function buyPremium() {
+      toast(t("در حال اتصال به درگاه پرداخت…"));
+      try {
+        const r = await fetch("/api/premium/buy", {method: "POST", credentials: "same-origin"}), d = await r.json().catch(() => ({}));
+        if (r.ok && d.ok && d.url) { location.href = d.url; return; }
+        toast(d.error || t("شروع پرداخت انجام نشد."));
+      } catch (_) { toast(t("اتصال برقرار نشد. دوباره تلاش کن.")); }
+    }
+    /* coming back from the payment gateway */
+    (function () {
+      const q = new URLSearchParams(location.search), st = q.get("premium"); if (!st) return;
+      const msg = {ok: "پرداخت موفق بود؛ پریمیوم فعال شد. ⭐", cancel: "پرداخت لغو شد.", failed: "پرداخت تأیید نشد. اگر مبلغ کم شده، با پشتیبانی در ارتباط باش.", error: "تأیید پرداخت با خطا روبه‌رو شد. با پشتیبانی در ارتباط باش.", unknown: "پرداخت پیدا نشد."}[st];
+      q.delete("premium"); history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
+      if (msg) setTimeout(() => toast(t(msg)), 800);
+    })();
 
     /* ---------- viewer ---------- */
     function open(a, b) {
