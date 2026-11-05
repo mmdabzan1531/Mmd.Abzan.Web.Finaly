@@ -9,7 +9,7 @@
     <div class="searchbox"><input id="chat-search" placeholder="جستجوی گفتگو یا نام کاربری…" autocomplete="off" aria-label="جستجو"></div>
     <nav id="group-list" class="group-list"></nav>
     <div class="me" id="open-profile" role="button" tabindex="0"><div class="avatar" id="my-avatar">{% if current_user.avatar_url %}<img src="{{ current_user.avatar_url }}" alt="">{% else %}{{ current_user.avatar }}{% endif %}</div><div class="me-info" data-no-i18n><strong id="my-display">{{ current_user.display_name }}</strong><span>@{{ current_user.username }}</span></div></div>
-    <div class="side-nav"><button type="button" id="open-settings"><i>⚙</i>تنظیمات</button><button type="button" id="open-my-background"><i>🖼</i>پس‌زمینه من</button><a href="/about#about"><i>ℹ</i>درباره ما</a><a href="/support#support"><i>🛟</i>پشتیبانی</a><a href="/lang" id="open-lang"><i>🌐</i>زبان</a><a href="{{ url_for('logout') }}"><i>⎋</i>خروج</a></div>
+    <div class="side-nav"><a href="/insta" id="open-insta"><i>📸</i>Insta Mode</a><button type="button" id="open-settings"><i>⚙</i>تنظیمات</button><button type="button" id="open-my-background"><i>🖼</i>پس‌زمینه من</button><a href="/about#about"><i>ℹ</i>درباره ما</a><a href="/support#support"><i>🛟</i>پشتیبانی</a><a href="/lang" id="open-lang"><i>🌐</i>زبان</a><a href="{{ url_for('logout') }}"><i>⎋</i>خروج</a></div>
     <span id="online-count" hidden>0</span>
   </aside>
   <main class="room">
