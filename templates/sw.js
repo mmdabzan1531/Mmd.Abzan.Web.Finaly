@@ -1,7 +1,13 @@
 const CACHE = "chatroom-{{ ASSET_V }}";
-const SHELL = ["/static/style.css", "/static/extra.css", "/static/themes.css", "/static/auth.css", "/static/theme.js", "/static/i18n-data.js", "/static/i18n.js", "/static/pwa.js", "/static/chat.js", "/static/chat-plus.js", "/static/auth.js", "/offline"];
+const V = "?v={{ ASSET_V }}";
+const SHELL = ["style.css", "extra.css", "themes.css", "auth.css", "attach.css", "chat-nav.css", "stories.css",
+  "theme.js", "i18n-data.js", "i18n.js", "pwa.js", "auth.js", "chat.js", "chat-plus.js", "chat-bg.js", "chat-nav.js", "stories.js"]
+  .map(f => "/static/" + f + V).concat(["/offline"]);
 const CDN = ["fonts.googleapis.com", "fonts.gstatic.com", "cdn.socket.io", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"];
-self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting())); });
+self.addEventListener("install", e => {
+  // one missing file must not abort the whole install (addAll is all-or-nothing)
+  e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(SHELL.map(u => c.add(u)))).then(() => self.skipWaiting()));
+});
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", e => {
   const req = e.request, url = new URL(req.url);
