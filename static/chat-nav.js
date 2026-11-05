@@ -81,13 +81,15 @@
       /* ⋮ menu: every action proxies to the original (now hidden) controls, so old handlers keep working */
       $("tg-more").addEventListener("click", () => {
         const box = document.createElement("div"); box.className = "tg-menu";
-        const add = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "key"; b.textContent = label; b.onclick = () => { C.hideModal("sheet"); fn(); }; box.appendChild(b); };
-        add(t("گروه جدید"), () => { const b = $("open-create-group"); b && b.click(); });
+        const add = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "key"; b.textContent = label; b.onclick = () => { C.hideModal("sheet"); setTimeout(fn, 60); }; box.appendChild(b); };
+        add(t("گروه جدید"), () => C.showModal("create-group-modal"));
         const inst = document.querySelector("[data-install-btn]"); if (inst && !inst.hidden) add(t("نصب برنامه"), () => inst.click());
-        add(t("پس‌زمینه من"), () => { const b = $("open-my-background"); b && b.click(); });
-        [["#open-lang", "زبان"], ['.side-nav a[href*="about"]', "درباره ما"], ['.side-nav a[href*="support"]', "پشتیبانی"], ['.side-nav a[href*="logout"]', "خروج"]].forEach(([sel, label]) => {
-          const a = document.querySelector(sel); if (a) add(t(label), () => { location.href = a.getAttribute("href"); });
-        });
+        add(t("پس‌زمینه من"), () => { const b = $("open-my-background"); b ? b.click() : window.CRTheme && window.CRTheme.openPicker && window.CRTheme.openPicker(); });
+        const lo = document.querySelector('.side-nav a[href*="logout"]');
+        add(t("زبان"), () => { location.href = "/lang?next=" + encodeURIComponent(location.pathname + location.search); });
+        add(t("درباره ما"), () => { location.href = "/about#about"; });
+        add(t("پشتیبانی"), () => { location.href = "/support#support"; });
+        add(t("خروج"), () => { location.href = lo ? lo.getAttribute("href") : "/logout"; });
         C.sheet("منو", box, [{label: "بستن"}]);
       });
 
