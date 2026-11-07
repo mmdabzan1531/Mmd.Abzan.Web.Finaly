@@ -71,3 +71,9 @@ body.chat-body{padding-bottom:0}
   .nav-page{animation:none!important}
   .nav-bar button::after{transition:none}
 }
+
+/* ---------- 5th tab (Insta): fit five items in the bottom bar ---------- */
+.nav-bar{grid-template-columns:repeat(5,1fr)}
+.nav-bar button{flex:1 1 0;min-width:0}
+.nav-bar button span:not(.nav-av){font-size:11px;white-space:nowrap}
+.nav-bar button[data-tab="insta"] svg{color:#e1306c}
