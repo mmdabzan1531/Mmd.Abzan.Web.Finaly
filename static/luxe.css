@@ -1,0 +1,57 @@
+/* ===== luxe.css — final polish layer (load LAST). Brushed-silver look from the logo,
+   motion rules: ease-out curves, <=250ms, press = scale(.97), never from scale(0), respects reduced-motion ===== */
+:root{--ease:cubic-bezier(.23,1,.32,1);--ease-io:cubic-bezier(.77,0,.175,1);--r:14px;
+  --silver:linear-gradient(145deg,#f4f5f7 0%,#c4c7ce 38%,#8d9099 62%,#dfe1e6 100%)}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+::selection{background:color-mix(in srgb,var(--aril) 40%,transparent)}
+*{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+
+/* focus: one calm ring */
+:focus-visible{outline:2px solid var(--melon);outline-offset:2px;border-radius:inherit}
+
+/* buttons: tactile press, no layout shift */
+.key,.ig-btn,.group-item,.tg-more,.eye,.ig-foot .tools button{transition:transform .16s var(--ease),background-color .2s var(--ease),border-color .2s var(--ease),filter .2s var(--ease),box-shadow .2s var(--ease)}
+.key:active,.ig-btn:active:not(:disabled),.group-item:active{transform:scale(.97)!important}
+@media(hover:hover){.key:hover{filter:none;border-color:var(--mute)}.ig-btn:hover:not(:disabled){filter:none}}
+
+/* primary actions: brushed-silver sheen (silver theme) / gradient (others) */
+.ig-btn{position:relative;overflow:hidden;isolation:isolate;border-radius:var(--r);letter-spacing:.01em}
+.ig-btn::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.35) 50%,transparent 65%);transform:translateX(-120%);transition:transform .7s var(--ease)}
+@media(hover:hover){.ig-btn:hover:not(:disabled)::after{transform:translateX(120%)}}
+html[data-theme=silver] .ig-btn,html[data-theme=silver] .key.hot,html[data-theme=silver] .key.on{background:var(--silver);color:#0a0a0b;border-color:transparent}
+html[data-theme=silver] .msg.mine .bubble{background:linear-gradient(145deg,#e6e8ec,#a3a7b0);color:#0a0a0b}
+html[data-theme=silver] .group-tile{background:var(--silver);color:#0a0a0b}
+html[data-theme=silver] .group-item:not(.active) .group-tile{background:var(--raise);color:var(--ink)}
+html[data-theme=silver] .group-item.active{box-shadow:inset 3px 0 0 #c4c7ce}
+
+/* glass bars */
+.room-head,.side-head{background:color-mix(in srgb,var(--deck) 82%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px)}
+.room-head{position:sticky;top:0;z-index:5}
+
+/* auth: logo hero + cards */
+.ig-brand .logo{width:168px;height:168px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 1px rgba(255,255,255,.06),0 24px 60px -20px rgba(196,199,206,.35);animation:luxe-in .6s var(--ease) both}
+.ig-card{border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,var(--deck) 94%,#fff 6%),var(--deck));box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 30px 60px -40px #000;position:relative;overflow:hidden}
+.ig-card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s var(--ease);background:radial-gradient(360px circle at var(--mx,50%) var(--my,0%),rgba(255,255,255,.07),transparent 60%)}
+@media(hover:hover){.ig-card:hover::before{opacity:1}}
+.ig-main>*{animation:luxe-in .5s var(--ease) both}
+.ig-main>*:nth-child(2){animation-delay:.05s}.ig-main>*:nth-child(3){animation-delay:.1s}.ig-main>*:nth-child(4){animation-delay:.15s}
+.fl input{border-radius:12px;transition:border-color .2s var(--ease),box-shadow .2s var(--ease),background-color .2s var(--ease)}
+.fl input:focus{border-color:var(--melon);box-shadow:0 0 0 3px color-mix(in srgb,var(--melon) 18%,transparent)}
+.fl label{transition:top .18s var(--ease),font-size .18s var(--ease),color .18s}
+.fl input:focus+label{color:var(--melon)}
+.ig-foot{opacity:.9}
+
+/* chat: new messages ease in (only the last two, so re-renders don't flash the whole feed) */
+.feed>.msg:nth-last-child(-n+2){animation:luxe-msg .22s var(--ease) both}
+.bubble{box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
+.badge{box-shadow:0 0 0 3px var(--deck)}
+.day{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+
+/* modals / menus pop from their origin, never from 0 */
+.chat-overflow-menu:not([hidden]){animation:luxe-pop .16s var(--ease) both;transform-origin:top left;border-radius:16px;box-shadow:0 20px 50px -12px #000a;border:1px solid var(--line)}
+
+@keyframes luxe-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes luxe-msg{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes luxe-pop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
