@@ -1,0 +1,73 @@
+/* ===== chat-nav.css: navigation layer for Chatroom (bottom bar, header, ⋮ menu, tab pages) =====
+   Uses the theme variables (--deck, --ink, --line, --aril ...) so every theme works, light or dark. */
+
+/* ---------- legacy static bottom bar: replaced by #nav-bar (chat-nav.js) ----------
+   It had no handlers, used fixed light colors and added 70px of empty space under the composer. */
+.chat-bottom-nav{display:none!important}
+body.chat-body{padding-bottom:0}
+
+/* ---------- header ---------- */
+.chat-body .side-head.tg-head{display:flex;align-items:center}
+.chat-body .side-head.tg-head > .tg-title{min-width:0}
+.chat-body .side-head.tg-head > #tg-more{flex:0 0 auto;margin-inline-start:8px}
+.tg-title{transition:color .25s}
+
+/* ---------- ⋮ overflow menu ---------- */
+.chat-body .chat-overflow-menu{
+  position:absolute;z-index:220;top:56px;inset-inline-start:12px;width:min(268px,calc(100vw - 28px));padding:6px;
+  background:color-mix(in srgb,var(--deck) 92%,transparent);color:var(--ink);
+  border:1px solid var(--line);border-radius:18px;
+  -webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);
+  box-shadow:0 22px 50px -14px rgba(0,0,0,.55);direction:rtl;transform-origin:top left}
+.chat-body .chat-overflow-menu[hidden]{display:none}
+.chat-body .chat-overflow-menu a,
+.chat-body .chat-overflow-menu button{
+  width:100%;min-height:44px;display:flex;align-items:center;gap:11px;padding:8px 12px;border:0;border-radius:12px;
+  background:transparent;color:inherit;text-decoration:none;text-align:right;font:inherit;cursor:pointer;
+  transition:background .15s,transform .12s}
+.chat-body .chat-overflow-menu a:hover,
+.chat-body .chat-overflow-menu button:hover{background:var(--raise)}
+.chat-body .chat-overflow-menu a:active,
+.chat-body .chat-overflow-menu button:active{transform:scale(.98)}
+.chat-body .chat-overflow-menu span{flex:1}
+
+/* ---------- bottom tab bar (#nav-bar) ---------- */
+.nav-bar button{-webkit-tap-highlight-color:transparent}
+.nav-bar button::after{content:"";position:absolute;inset-inline:30%;bottom:2px;height:3px;border-radius:3px;background:var(--aril);
+  transform:scaleX(0);transition:transform .25s cubic-bezier(.23,1,.32,1)}
+.nav-bar button.on::after{transform:scaleX(1)}
+.nav-bar button:focus-visible{outline:2px solid var(--melon);outline-offset:-2px}
+.nav-bar .nav-badge{box-shadow:0 0 0 2px var(--deck)}
+@media(min-width:861px){.nav-bar{inset-inline:16px}}
+
+/* ---------- tab pages (contacts / settings / profile) ---------- */
+.nav-page{overscroll-behavior:contain}
+.side[data-tab="contacts"] #page-contacts,
+.side[data-tab="settings"] #page-settings,
+.side[data-tab="profile"] #page-profile{animation:nav-page-in .22s cubic-bezier(.23,1,.32,1) both}
+@keyframes nav-page-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.nav-top h2{letter-spacing:.01em}
+.c-row,.c-act,.s-item{transition:background .15s,transform .12s}
+.c-row:active,.c-act:active,.s-item:active{transform:scale(.985)}
+.c-ico{box-shadow:0 8px 18px -10px var(--aril)}
+.s-group{border:1px solid var(--line);background:color-mix(in srgb,var(--night) 80%,transparent)}
+.p-btns button{border:1px solid transparent;transition:background .15s,border-color .15s,transform .12s}
+.p-btns button:hover{border-color:var(--line)}
+.p-btns button:active{transform:scale(.97)}
+.p-hero .avatar{box-shadow:0 0 0 3px var(--deck),0 0 0 5px var(--aril)}
+
+/* ---------- stories row ---------- */
+.tg-stories{-webkit-mask-image:linear-gradient(to left,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(to left,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%)}
+.tg-st:active .tg-ring{transform:scale(.94)}
+.tg-ring{transition:transform .15s}
+
+/* ---------- phones: the chat list is a full-screen first page ---------- */
+@media(max-width:860px){
+  .side{overscroll-behavior:contain}
+  .side .group-list{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .nav-page{animation:none!important}
+  .nav-bar button::after{transition:none}
+}
