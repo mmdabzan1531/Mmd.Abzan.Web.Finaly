@@ -30,6 +30,7 @@
       sync: '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M3 21v-5h5"/></svg>',
       trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
       info2: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v5.5M12 7.8h.01"/></svg>',
+      insta: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.6" r=".7"/></svg>',
       close: '✕'
     };
     const store = {get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} }};
@@ -59,6 +60,7 @@
         <button type="button" data-tab="contacts">${ICON.contacts}<span>${esc(t("مخاطبین"))}</span></button>
         <button type="button" data-tab="settings">${ICON.settings}<span>${esc(t("تنظیمات"))}</span></button>
         <button type="button" data-tab="profile"><span class="nav-av" id="nav-av"></span><span>${esc(t("پروفایل"))}</span></button>
+        <button type="button" data-tab="insta">${ICON.insta}<span>Insta</span></button>
       </nav>`);
     side.dataset.tab = "chats";
 
@@ -81,36 +83,59 @@
       if (conn) { new MutationObserver(syncTitle).observe(conn, {attributes: true, attributeFilter: ["data-state"]}); }
       syncTitle();
 
-      /* ⋮ menu: every action proxies to the original (now hidden) controls, so old handlers keep working */
-      $("tg-more").addEventListener("click", () => {
-        const box = document.createElement("div"); box.className = "tg-menu";
-        const add = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "key"; b.textContent = label; b.onclick = () => { C.hideModal("sheet"); setTimeout(fn, 60); }; box.appendChild(b); };
-        add(t("گروه جدید"), () => C.showModal("create-group-modal"));
-        add("📸 Insta Mode", () => { location.href = "/insta"; });
-        const inst = document.querySelector("[data-install-btn]"); if (inst && !inst.hidden) add(t("نصب برنامه"), () => inst.click());
-        add(t("پس‌زمینه من"), () => { const b = $("open-my-background"); b ? b.click() : window.CRTheme && window.CRTheme.openPicker && window.CRTheme.openPicker(); });
-        const lo = document.querySelector('.side-nav a[href*="logout"]');
-        add(t("زبان"), () => {   // medium in-page window instead of the separate language page
-          const LANGS = [["fa", "فارسی"], ["en", "English"], ["ar", "العربية"], ["tr", "Türkçe"], ["ru", "Русский"], ["es", "Español"], ["fr", "Français"], ["zh", "中文"]];
-          const cur = window.CR_LANG || (document.documentElement.lang || "fa").slice(0, 2), lb = document.createElement("div"); lb.className = "tg-menu";
-          LANGS.forEach(([code, name]) => {
-            const b = document.createElement("button"); b.type = "button"; b.className = "key" + (code === cur ? " hot" : ""); b.setAttribute("data-no-i18n", ""); b.textContent = (code === cur ? "✓  " : "") + name;
-            b.onclick = async () => {
-              if (code === cur) return C.hideModal("sheet");
-              b.disabled = true;
-              try { await fetch("/lang/" + code + "?next=%2Fchat", {credentials: "same-origin"}); } catch (_) {}
-              location.reload();
-            };
-            lb.appendChild(b);
-          });
-          C.sheet("زبان", lb, [{label: "بستن"}]);
+      /* ⋮ menu: a small popover over the page (not full screen). Every item calls the real action. */
+      function closeMore() { const o = $("more-pop"); if (o) o.remove(); }
+      function langSheet() {
+        const LANGS = [["fa", "فارسی"], ["en", "English"], ["ar", "العربية"], ["tr", "Türkçe"], ["ru", "Русский"], ["es", "Español"], ["fr", "Français"], ["zh", "中文"]];
+        const cur = window.CR_LANG || (document.documentElement.lang || "fa").slice(0, 2), lb = document.createElement("div"); lb.className = "tg-menu";
+        LANGS.forEach(([code, name]) => {
+          const b = document.createElement("button"); b.type = "button"; b.className = "key" + (code === cur ? " hot" : ""); b.setAttribute("data-no-i18n", ""); b.textContent = (code === cur ? "✓  " : "") + name;
+          b.onclick = async () => {
+            if (code === cur) return C.hideModal("sheet");
+            b.disabled = true;
+            try { await fetch("/lang/" + code + "?next=%2Fchat", {credentials: "same-origin"}); } catch (_) {}
+            location.reload();
+          };
+          lb.appendChild(b);
         });
-        add(t("درباره ما"), () => { location.href = "/about#about"; });
-        add(t("پشتیبانی"), () => { location.href = "/support#support"; });
-        add(t("خروج"), () => C.confirmSheet("مطمئنی می‌خوای از حساب خارج بشی؟", "خروج", () => { location.href = lo ? lo.getAttribute("href") : "/logout"; }));
-        const ver = document.createElement("small"); ver.textContent = "نسخه برنامه: r12"; ver.style.cssText = "opacity:.5;text-align:center;margin-top:4px"; box.appendChild(ver);
-                C.sheet("منو", box, [{label: "بستن"}]);
-      });
+        C.sheet("زبان", lb, [{label: "بستن"}]);
+      }
+      function openMore() {
+        if ($("more-pop")) return closeMore();
+        const lo = document.querySelector('.side-nav a[href*="logout"]');
+        const inst = document.querySelector("[data-install-btn]");
+        const items = [
+          ["📸", "Insta Mode", () => { location.href = "/insta"; }],
+          ["👥", t("گروه جدید"), () => C.showModal("create-group-modal")]
+        ];
+        if (inst && !inst.hidden) items.push(["⬇️", t("نصب برنامه"), () => inst.click()]);
+        items.push(
+          ["🖼", t("پس‌زمینه من"), () => { const b = $("open-my-background"); b ? b.click() : window.CRTheme && window.CRTheme.openPicker && window.CRTheme.openPicker(); }],
+          ["🌐", t("زبان"), langSheet],
+          ["ℹ️", t("درباره ما"), () => { location.href = "/about#about"; }],
+          ["🛟", t("پشتیبانی"), () => { location.href = "/support#support"; }],
+          ["⎋", t("خروج"), () => C.confirmSheet("مطمئنی می‌خوای از حساب خارج بشی؟", "خروج", () => { location.href = lo ? lo.getAttribute("href") : "/logout"; })]
+        );
+        const ov = document.createElement("div"); ov.id = "more-pop";
+        ov.style.cssText = "position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.28)";
+        const box = document.createElement("div"); box.setAttribute("role", "menu"); box.dir = document.documentElement.dir || "rtl";
+        const r = $("tg-more").getBoundingClientRect(), W = Math.min(250, innerWidth - 16);
+        const left = Math.max(8, Math.min(r.left, innerWidth - W - 8));
+        box.style.cssText = "position:absolute;top:" + (r.bottom + 6) + "px;left:" + left + "px;width:" + W + "px;max-height:calc(100vh - " + (r.bottom + 20) + "px);overflow:auto;padding:6px;border-radius:18px;background:var(--card,var(--deck,#fff));color:var(--ink,#3b1f2b);border:1px solid var(--line,rgba(0,0,0,.12));box-shadow:0 18px 50px -10px rgba(0,0,0,.45)";
+        items.forEach(([ico, label, fn]) => {
+          const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "menuitem");
+          b.style.cssText = "display:flex;align-items:center;gap:12px;width:100%;min-height:46px;padding:8px 12px;border:0;border-radius:12px;background:transparent;color:inherit;font:inherit;text-align:start;cursor:pointer";
+          b.innerHTML = '<span style="width:24px;text-align:center;font-size:18px">' + ico + '</span><span style="flex:1"></span>';
+          b.lastChild.textContent = label;
+          b.addEventListener("click", () => { closeMore(); setTimeout(fn, 50); });
+          box.appendChild(b);
+        });
+        const ver = document.createElement("div"); ver.textContent = "نسخه برنامه: r13"; ver.style.cssText = "opacity:.45;text-align:center;font-size:12px;padding:6px"; box.appendChild(ver);
+        ov.appendChild(box); ov.addEventListener("click", e => { if (e.target === ov) closeMore(); });
+        document.body.appendChild(ov);
+      }
+      document.addEventListener("keydown", e => { if (e.key === "Escape") closeMore(); });
+      $("tg-more").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); openMore(); });
 
       /* stories row */
       const row = $("tg-stories"), me = (cfg && cfg.username) || (document.querySelector(".me-info span") || {}).textContent || "";
@@ -174,7 +199,7 @@
       if (name === "settings") renderSettings();
       if (name === "profile") loadProfile();
     }
-    $("nav-bar").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (!b) return; if (navigator.vibrate) navigator.vibrate(6); setTab(b.dataset.tab); });
+    $("nav-bar").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (!b) return; if (navigator.vibrate) navigator.vibrate(6); if (b.dataset.tab === "insta") { location.href = "/insta"; return; } setTab(b.dataset.tab); });
 
     /* ---------- entering the app always lands on the chat list ---------- */
     const hasDeepLink = /[?&]group=/.test(location.search);          // invite links still go straight to their group
