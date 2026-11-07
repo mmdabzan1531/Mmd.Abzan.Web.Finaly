@@ -105,7 +105,6 @@
         const lo = document.querySelector('.side-nav a[href*="logout"]');
         const inst = document.querySelector("[data-install-btn]");
         const items = [
-          ["📸", "Insta Mode", () => { location.href = "/insta"; }],
           ["👥", t("گروه جدید"), () => C.showModal("create-group-modal")]
         ];
         if (inst && !inst.hidden) items.push(["⬇️", t("نصب برنامه"), () => inst.click()]);
@@ -130,7 +129,7 @@
           b.addEventListener("click", () => { closeMore(); setTimeout(fn, 50); });
           box.appendChild(b);
         });
-        const ver = document.createElement("div"); ver.textContent = "نسخه برنامه: r13"; ver.style.cssText = "opacity:.45;text-align:center;font-size:12px;padding:6px"; box.appendChild(ver);
+        const ver = document.createElement("div"); ver.textContent = "نسخه برنامه: r14"; ver.style.cssText = "opacity:.45;text-align:center;font-size:12px;padding:6px"; box.appendChild(ver);
         ov.appendChild(box); ov.addEventListener("click", e => { if (e.target === ov) closeMore(); });
         document.body.appendChild(ov);
       }
