@@ -86,6 +86,7 @@
         const box = document.createElement("div"); box.className = "tg-menu";
         const add = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "key"; b.textContent = label; b.onclick = () => { C.hideModal("sheet"); setTimeout(fn, 60); }; box.appendChild(b); };
         add(t("گروه جدید"), () => C.showModal("create-group-modal"));
+        add("📸 Insta Mode", () => { location.href = "/insta"; });
         const inst = document.querySelector("[data-install-btn]"); if (inst && !inst.hidden) add(t("نصب برنامه"), () => inst.click());
         add(t("پس‌زمینه من"), () => { const b = $("open-my-background"); b ? b.click() : window.CRTheme && window.CRTheme.openPicker && window.CRTheme.openPicker(); });
         const lo = document.querySelector('.side-nav a[href*="logout"]');
@@ -107,7 +108,7 @@
         add(t("درباره ما"), () => { location.href = "/about#about"; });
         add(t("پشتیبانی"), () => { location.href = "/support#support"; });
         add(t("خروج"), () => C.confirmSheet("مطمئنی می‌خوای از حساب خارج بشی؟", "خروج", () => { location.href = lo ? lo.getAttribute("href") : "/logout"; }));
-        const ver = document.createElement("small"); ver.textContent = "نسخه برنامه: r11"; ver.style.cssText = "opacity:.5;text-align:center;margin-top:4px"; box.appendChild(ver);
+        const ver = document.createElement("small"); ver.textContent = "نسخه برنامه: r12"; ver.style.cssText = "opacity:.5;text-align:center;margin-top:4px"; box.appendChild(ver);
                 C.sheet("منو", box, [{label: "بستن"}]);
       });
 
@@ -347,6 +348,7 @@
       };
       const groups = [
         [null, [
+          item("#e1306c", ICON.camera, "Insta Mode", t("عکس، ریلز و استوری"), () => { location.href = "/insta"; }),
           item("#3a8ee6", ICON.user, t("حساب کاربری"), t("نام، بیو، عکس، تاریخ تولد"), () => C.showModal("profile-modal")),
           item("#e59a2e", ICON.chat, t("تنظیمات ظاهری گفتگو"), t("تم، فونت، پس‌زمینه"), chatSettings),
           item("#3fae5a", ICON.lock, t("حریم خصوصی"), t("نمایش شماره، ایمیل و تاریخ تولد"), openPrivacy),
