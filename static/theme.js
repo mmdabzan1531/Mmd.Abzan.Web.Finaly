@@ -89,7 +89,9 @@
   function pref() { try { return localStorage.getItem(KEY) || "auto"; } catch (e) { return "auto"; } }
   function resolve(p) {
     if (p === "auto") return mq && mq.matches ? "barf" : "silver";
-    return THEMES.some(function (t) { return t.id === p; }) ? p XX() {
+    return THEMES.some(function (t) { return t.id === p; }) ? p : "silver";
+  }
+  function apply() {
     var id = resolve(pref());
     document.documentElement.setAttribute("data-theme", id);
     var m = document.querySelector('meta[name="theme-color"]');
