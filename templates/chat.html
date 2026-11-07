@@ -96,6 +96,10 @@
 <div class="modal" id="sheet"><section class="card"><h2 id="sheet-title"></h2><div id="sheet-body"></div><div class="actions" id="sheet-actions"></div></section></div>
 
 <script>
+/* phones: show the chat list immediately (before chat.js/chat-nav.js finish loading) unless an invite link points at a group */
+(function(){var s=document.getElementById("sidebar");if(s&&matchMedia("(max-width:860px)").matches&&!/[?&]group=/.test(location.search))s.classList.add("open");})();
+</script>
+<script>
 window.CHATROOM = {
   username: {{ current_user.username|tojson }}, me: {{ current_user|tojson }},
   initialUsers: {{ users|tojson }}, initialGroups: {{ groups|tojson }},
@@ -116,8 +120,8 @@ window.CHATROOM = {
     if (typeof io === "function" || i >= srcs.length) return boot();
     var s = document.createElement("script"), done = false;
     function go(ok) { if (done) return; done = true; clearTimeout(t); ok && typeof io === "function" ? boot() : next(i + 1); }
-    /* a blocked CDN can hang for a long time: give each source only 4 s, then try the next */
-    var t = setTimeout(function () { go(false); }, 4000);
+    /* a blocked CDN can hang for a long time: give each source only 3 s, then try the next */
+    var t = setTimeout(function () { go(false); }, 3000);
     s.src = srcs[i]; s.onload = function () { go(true); }; s.onerror = function () { go(false); };
     document.head.appendChild(s);
   })(0);
