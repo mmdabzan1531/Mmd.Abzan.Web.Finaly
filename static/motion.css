@@ -1,0 +1,70 @@
+/* ===== motion.css: additive motion + polish layer for Chatroom (loaded LAST) =====
+   Nothing here replaces your theme: it only reads the existing theme variables (--aril, --raise, --ink, --line ...)
+   so all 16 themes keep working. Uses the individual `scale` / `translate` properties so it never clobbers
+   an element's own `transform`. Delete the <link> to motion.css to undo everything. */
+:root{
+  --ease-out:cubic-bezier(.23,1,.32,1);
+  --ease-in-out:cubic-bezier(.77,0,.175,1);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --t-fast:.14s;--t-base:.22s;--t-slow:.34s;
+}
+html{-webkit-tap-highlight-color:transparent}
+::selection{background:color-mix(in srgb,var(--aril,#e5385e) 28%,transparent)}
+*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,currentColor 26%,transparent) transparent}
+:where(a,button,input,textarea,select,[role=button],[tabindex]):focus-visible{outline:2px solid var(--aril,#e5385e);outline-offset:2px}
+
+/* ---------- press feedback + smooth state changes ---------- */
+.chat-body .key,.chat-body .c-act,.chat-body .s-item,.chat-body .c-row,.chat-body .group-item,
+.chat-body .tg-st,.chat-body .p-btns button,.chat-body .side-nav button,.chat-body .side-nav a,.chat-body .nav-fab{
+  transition:scale var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out),background-color var(--t-base) ease,
+    box-shadow var(--t-base) ease,border-color var(--t-base) ease,opacity var(--t-base) ease,color var(--t-base) ease}
+.chat-body .key:active,.chat-body .nav-fab:active,.chat-body .p-btns button:active{scale:.94}
+.chat-body .group-item:active,.chat-body .c-row:active,.chat-body .s-item:active,.chat-body .c-act:active{scale:.985}
+@media(hover:hover){
+  .chat-body .key.hot:hover,.chat-body .nav-fab:hover{box-shadow:0 10px 26px -10px var(--aril,#e5385e)}
+  .chat-body .group-item:hover,.chat-body .c-row:hover,.chat-body .s-item:hover{background-color:color-mix(in srgb,var(--raise,#000) 60%,transparent)}
+}
+
+/* ---------- windows, sheets and menus ---------- */
+.modal{-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:mo-fade var(--t-base) ease backwards}
+.modal .card{animation:mo-card var(--t-slow) var(--ease-out) backwards}
+.menu{animation:mo-pop .16s var(--ease-out) backwards}
+.lightbox img{animation:mo-card var(--t-slow) var(--ease-out) backwards}
+@keyframes mo-fade{from{opacity:0}}
+@keyframes mo-card{from{opacity:0;translate:0 18px;scale:.96}}
+@keyframes mo-pop{from{opacity:0;scale:.92}}
+
+/* three-dot popover (built by chat-nav.js) */
+#more-pop{animation:mo-fade .18s ease backwards;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+#more-pop>div{transform-origin:top left;animation:mo-pop-menu .24s var(--ease-out) backwards}
+@keyframes mo-pop-menu{from{opacity:0;scale:.9;translate:0 -6px}}
+#more-pop button{transition:background-color var(--t-base) ease,scale var(--t-fast) var(--ease-out);animation:mo-item .3s var(--ease-out) backwards}
+#more-pop button:active{scale:.97;background-color:var(--raise,rgba(0,0,0,.07))}
+@media(hover:hover){#more-pop button:hover{background-color:var(--raise,rgba(0,0,0,.06))}}
+#more-pop button:nth-child(1){animation-delay:20ms}#more-pop button:nth-child(2){animation-delay:50ms}
+#more-pop button:nth-child(3){animation-delay:80ms}#more-pop button:nth-child(4){animation-delay:110ms}
+#more-pop button:nth-child(5){animation-delay:140ms}#more-pop button:nth-child(6){animation-delay:170ms}
+#more-pop button:nth-child(7){animation-delay:200ms}#more-pop button:nth-child(8){animation-delay:230ms}
+@keyframes mo-item{from{opacity:0;translate:0 8px}}
+
+/* ---------- bottom bar ---------- */
+.nav-bar{-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4)}
+.nav-bar button svg,.nav-bar button .nav-av{transition:scale .26s var(--spring)}
+.nav-bar button:active svg,.nav-bar button:active .nav-av{scale:.84}
+.nav-bar button.on svg,.nav-bar button.on .nav-av{animation:mo-tab .42s var(--spring)}
+@keyframes mo-tab{0%{scale:.78}60%{scale:1.16}100%{scale:1}}
+.nav-fab{animation:mo-fab .5s var(--spring) backwards}
+@keyframes mo-fab{from{opacity:0;scale:.5}}
+
+/* ---------- stories row ---------- */
+.tg-st.unseen .tg-ring{animation:mo-ring 2.8s ease-in-out infinite}
+@keyframes mo-ring{50%{filter:saturate(1.4) brightness(1.1)}}
+.tg-st:active{scale:.94}
+
+/* ---------- inputs ---------- */
+#message-input,#chat-search,.searchbox input,.card input,.card textarea{transition:box-shadow var(--t-base) ease,border-color var(--t-base) ease,background-color var(--t-base) ease}
+#message-input:focus,#chat-search:focus,.searchbox input:focus,.card input:focus,.card textarea:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--aril,#e5385e) 22%,transparent)}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
