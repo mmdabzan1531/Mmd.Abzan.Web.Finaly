@@ -3,6 +3,7 @@
   var KEY = "cr:theme", FKEY = "cr:font", SKEY = "cr:fsize";
   var THEMES = [
     // dark
+    {id: "silver", name: "نقره‌ای", sub: "مشکی و نقره (لوگو)", dark: 1, sw: ["#000000", "#C4C7CE", "#A6E9CF"], bar: "#000000"},
     {id: "noir", name: "سیاه", sub: "مشکی مطلق", dark: 1, sw: ["#000000", "#7C5CFF", "#5EEAD4"], bar: "#000000"},
     {id: "yalda", name: "یلدا", sub: "بنفش شبانه", dark: 1, sw: ["#1A1230", "#E5385E", "#B9DE82"], bar: "#1A1230"},
     {id: "firouzeh", name: "فیروزه", sub: "سبزآبی تیره", dark: 1, sw: ["#0C1B22", "#0E8F83", "#C5E86C"], bar: "#0C1B22"},
@@ -87,10 +88,8 @@
   var mq = window.matchMedia ? matchMedia("(prefers-color-scheme: light)") : null;
   function pref() { try { return localStorage.getItem(KEY) || "auto"; } catch (e) { return "auto"; } }
   function resolve(p) {
-    if (p === "auto") return mq && mq.matches ? "barf" : "noir";
-    return THEMES.some(function (t) { return t.id === p; }) ? p : "noir";
-  }
-  function apply() {
+    if (p === "auto") return mq && mq.matches ? "barf" : "silver";
+    return THEMES.some(function (t) { return t.id === p; }) ? p XX() {
     var id = resolve(pref());
     document.documentElement.setAttribute("data-theme", id);
     var m = document.querySelector('meta[name="theme-color"]');
