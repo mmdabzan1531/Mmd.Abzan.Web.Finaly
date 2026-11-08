@@ -113,6 +113,20 @@ window.CHATROOM = {
   maxFileMb: {{ max_file_mb|default(15)|tojson }}
 };
 </script>
+<script>
+/* "پس‌زمینه چت" inside the appearance dialog: close the dialog first, then trigger the real background picker
+   (chat-bg.js binds #cb-open-me / #open-my-background). Without closing, the picker opened underneath the dialog. */
+document.addEventListener("click", function (e) {
+  var b = e.target.closest && e.target.closest("#cr-modal button, #cr-modal [role=button]");
+  if (!b || (b.textContent || "").indexOf("پس‌زمینه چت") === -1) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (window.CRModal && CRModal.close) CRModal.close();
+  setTimeout(function () {
+    var t = document.getElementById("cb-open-me") || document.getElementById("open-my-background");
+    if (t) t.click();
+  }, 60);
+}, true);
+</script>
 <script src="{{ url_for('static', filename='chat-bg.js') }}?v={{ ASSET_V }}"></script>
 <script>
 /* socket.io client with CDN fallbacks (cdn.socket.io may be blocked); chat.js also works without it (HTTP fallback). */
