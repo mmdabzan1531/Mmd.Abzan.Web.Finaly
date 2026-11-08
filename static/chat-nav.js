@@ -34,6 +34,13 @@
       close: '✕'
     };
     const store = {get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} }};
+    /* open the background picker directly (chat-bg.js exposes CRBackground); clicking a hidden sidebar button was fragile */
+    function openBg() {
+      const B = window.CRBackground;
+      if (B && typeof B.openMe === "function") { try { B.openMe(); } catch (e) { toast("خطا در پس‌زمینه: " + ((e && e.message) || e)); } return; }
+      const b = $("open-my-background");
+      if (b) b.click(); else toast("بخش پس‌زمینه بارگذاری نشد؛ صفحه را یک بار تازه کن.");
+    }
     const closeBtn = '<button type="button" class="key round small mobile-only" data-nav-close aria-label="' + esc(t("بستن")) + '">✕</button>';
 
     /* ---------- skeleton ---------- */
@@ -109,7 +116,7 @@
         ];
         if (inst && !inst.hidden) items.push(["⬇️", t("نصب برنامه"), () => inst.click()]);
         items.push(
-          ["🖼", t("پس‌زمینه من"), () => { const b = $("open-my-background"); b ? b.click() : window.CRTheme && window.CRTheme.openPicker && window.CRTheme.openPicker(); }],
+          ["🖼", t("پس‌زمینه من"), openBg],
           ["🌐", t("زبان"), langSheet],
           ["ℹ️", t("درباره ما"), () => { location.href = "/about#about"; }],
           ["🛟", t("پشتیبانی"), () => { location.href = "/support#support"; }],
@@ -129,7 +136,7 @@
           b.addEventListener("click", () => { closeMore(); setTimeout(fn, 50); });
           box.appendChild(b);
         });
-        const ver = document.createElement("div"); ver.textContent = "نسخه برنامه: r14"; ver.style.cssText = "opacity:.45;text-align:center;font-size:12px;padding:6px"; box.appendChild(ver);
+        const ver = document.createElement("div"); ver.textContent = "نسخه برنامه: r15"; ver.style.cssText = "opacity:.45;text-align:center;font-size:12px;padding:6px"; box.appendChild(ver);
         ov.appendChild(box); ov.addEventListener("click", e => { if (e.target === ov) closeMore(); });
         document.body.appendChild(ov);
       }
@@ -365,7 +372,7 @@
       const openModalAt = id => { C.showModal("profile-modal"); const el = $(id); if (el) setTimeout(() => el.scrollIntoView({block: "center"}), 60); };
       const chatSettings = () => {
         const box = document.createElement("div"); box.style.cssText = "display:flex;flex-direction:column;gap:10px";
-        [[t("🎨 تم‌ها"), () => window.CRTheme && window.CRTheme.openPicker()], [t("🔤 فونت‌ها"), () => window.CRTheme && window.CRTheme.openFontPicker()], [t("🖼 پس‌زمینه چت"), () => { const b = $("open-my-background"); b && b.click(); }]].forEach(([label, fn]) => {
+        [[t("🎨 تم‌ها"), () => window.CRTheme && window.CRTheme.openPicker()], [t("🔤 فونت‌ها"), () => window.CRTheme && window.CRTheme.openFontPicker()], [t("🖼 پس‌زمینه چت"), openBg]].forEach(([label, fn]) => {
           const b = document.createElement("button"); b.type = "button"; b.className = "key"; b.textContent = label; b.onclick = () => { C.hideModal("sheet"); fn(); }; box.appendChild(b);
         });
         C.sheet("تنظیمات ظاهری گفتگو", box, [{label: "بستن"}]);
