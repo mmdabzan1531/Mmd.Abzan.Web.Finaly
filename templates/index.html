@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head>{% include "_head.html" %}<title>ورود | Chatroom</title>{% include "_ui.html" %}</head>
+<body class="auth-body">
+{% include "_star.html" %}
+<div class="ig">
+<main class="ig-main">
+  <section class="ig-card">
+    <div class="ig-brand"><svg class="mark"><use href="#star"/></svg><h1>Chatroom</h1><span class="owner">محمد مهدی آبزن</span></div>
+    {% with messages = get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="ig-note {{ 'ok' if category == 'success' else '' }}" role="alert">{{ message }}</div>{% endfor %}{% endwith %}
+    <form method="post" class="ig-form" id="login-form" data-gate autocomplete="on">
+      <div class="fl"><input id="identifier" name="identifier" dir="auto" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder=" " required><label for="identifier">نام کاربری، ایمیل یا شماره موبایل</label></div>
+      <div class="fl has-eye"><input id="password" name="password" type="password" dir="auto" autocomplete="current-password" placeholder=" " required><label for="password">رمز عبور</label><button type="button" class="eye" data-eye="password" hidden>نمایش</button></div>
+      {% if need_captcha %}<div class="fl"><input id="captcha" name="captcha" inputmode="numeric" autocomplete="off" placeholder=" " required><label for="captcha">{{ captcha_question }}</label></div>{% endif %}
+      <button class="ig-btn" type="submit">ورود</button>
+    </form>
+    <div class="ig-or">یا</div>
+    <div class="ig-links"><a href="/forgot">رمز خود را فراموش کرده‌اید؟</a></div>
+  </section>
+  <section class="ig-card slim">حساب کاربری ندارید؟ <a href="/signup">ثبت‌نام</a></section>
+  <section class="ig-get">برنامه را نصب کنید.<button type="button" class="ig-btn" data-install-btn hidden>نصب Chatroom</button></section>
+</main>
+{% include "_footer.html" %}
+</div>
+<script src="{{ url_for('static', filename='auth.js') }}?v={{ ASSET_V }}"></script><script src="{{ url_for('static', filename='pwa.js') }}?v={{ ASSET_V }}"></script>
+</body></html>
