@@ -239,7 +239,7 @@
   }
 
   function amAdmin(g) { return !!g && g.type !== "dm" && (g.owner === ME || (g.admins || []).indexOf(ME) > -1); }
-  function openMe() { openPicker("me"); }
+  function openMe() { try { openPicker("me"); } catch (e) { try { console.error("[chat-bg]", e); } catch (_) {} toast("خطا در باز کردن پس‌زمینه: " + ((e && e.message) || e)); } }
   function openGroup() {
     var gid = activeGid(), g = G()[gid];
     if (!gid || !g) { toast("اول وارد همان گروه شو، بعد دوباره امتحان کن."); return; }
@@ -247,7 +247,7 @@
     if (!amAdmin(g)) { toast("فقط مالک یا ادمین گروه می‌تواند پس‌زمینه‌ی گروه را عوض کند."); return; }
     openPicker("group", gid);
   }
-  window.CRBackground = { openMe: openMe, openGroup: openGroup };
+  window.CRBackground = { openMe: openMe, openGroup: openGroup, version: "2.1" };
 
   /* دکمه‌های داخل تنظیمات (در chat.html آمده‌اند؛ اینجا فقط وصل می‌شوند) */
   function bind(btn, fn) { if (btn && !btn.__cb) { btn.__cb = 1; btn.addEventListener("click", fn); } }
@@ -276,7 +276,7 @@
       var item = t.closest("button,a,li,[role=menuitem],[role=button],.menu-item");
       if (item) {
         var lbl = labelOf(item);
-        if (lbl.length <= 40 && /پس.زمینه (من|چت)/.test(lbl) && lbl.indexOf("گروه") === -1) hit = item;
+        if (lbl.length <= 40 && /پس.?زمینه (من|چت)/.test(lbl) && lbl.indexOf("گروه") === -1) hit = item;
       }
     }
     if (!hit) return;
