@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111"><title>ورود به Insta Mode</title>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#09090d"><meta name="color-scheme" content="dark"><title>ورود به Insta Mode</title>
 <style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 15% 5%,#5931a6 0,transparent 38%),radial-gradient(ellipse at 90% 95%,#e04b70 0,transparent 34%),#09090d;color:#fff;font-family:Tahoma,Arial,sans-serif;display:grid;place-items:center;padding:22px}.panel{width:min(100%,420px);padding:30px 25px;border:1px solid #ffffff25;border-radius:28px;background:#17171dcc;box-shadow:0 25px 80px #0008;backdrop-filter:blur(18px)}.brand{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px}.logo{width:54px;height:54px;border-radius:17px;padding:3px;background:linear-gradient(135deg,#ffd776,#fa477e,#8c39c9);display:grid;place-items:center}.lens{width:100%;height:100%;border:3px solid white;border-radius:14px;position:relative}.lens:before{content:"";position:absolute;width:17px;height:17px;border:3px solid white;border-radius:50%;inset:0;margin:auto}.lens:after{content:"";position:absolute;width:5px;height:5px;background:white;border-radius:50%;top:7px;right:7px}h1{font-size:28px;margin:0;letter-spacing:-1px}p{color:#b8b8c3;text-align:center;font-size:13px;margin:10px 0 24px}.tabs{display:flex;background:#292932;border-radius:12px;padding:4px;margin-bottom:18px}.tabs button{flex:1;border:0;border-radius:9px;padding:11px;background:none;color:#aaa;font-weight:700}.tabs button.active{background:linear-gradient(100deg,#8538c8,#e83e78);color:white}label{display:block;font-size:12px;color:#c9c9d1;margin:12px 2px 6px}input{width:100%;height:48px;border-radius:12px;border:1px solid #393944;background:#101015;color:white;padding:0 14px;outline:none}input:focus{border-color:#c04bba}button.submit{width:100%;height:49px;border:0;border-radius:13px;margin-top:20px;color:white;font-weight:800;background:linear-gradient(100deg,#833ab4,#c13584,#f77737)}#msg{min-height:22px;color:#ff9ba9;font-size:12px;text-align:center;margin-top:12px}.hint{text-align:center;color:#777;font-size:11px;margin-top:15px}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 15% 5%,#5931a6 0,transparent 38%),radial-gradient(ellipse at 90% 95%,#e04b70 0,transparent 34%),#09090d;color:#fff;font-family:Vazirmatn,Tahoma,Arial,sans-serif;display:grid;place-items:center;padding:22px}.panel{width:min(100%,420px);padding:30px 25px;border:1px solid #ffffff25;border-radius:28px;background:#17171dcc;box-shadow:0 25px 80px #0008;backdrop-filter:blur(18px)}.brand{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px}.logo{width:54px;height:54px;border-radius:17px;padding:3px;background:linear-gradient(135deg,#ffd776,#fa477e,#8c39c9);display:grid;place-items:center}.lens{width:100%;height:100%;border:3px solid white;border-radius:14px;position:relative}.lens:before{content:"";position:absolute;width:17px;height:17px;border:3px solid white;border-radius:50%;inset:0;margin:auto}.lens:after{content:"";position:absolute;width:5px;height:5px;background:white;border-radius:50%;top:7px;right:7px}h1{font-size:28px;margin:0;letter-spacing:-1px}p{color:#b8b8c3;text-align:center;font-size:13px;margin:10px 0 24px}.tabs{display:flex;background:#292932;border-radius:12px;padding:4px;margin-bottom:18px}.tabs button{flex:1;border:0;border-radius:9px;padding:11px;background:none;color:#aaa;font-weight:700}.tabs button.active{background:linear-gradient(100deg,#8538c8,#e83e78);color:white}label{display:block;font-size:12px;color:#c9c9d1;margin:12px 2px 6px}input{width:100%;height:48px;border-radius:12px;border:1px solid #393944;background:#101015;color:white;padding:0 14px;outline:none}input:focus{border-color:#c04bba}button.submit{width:100%;height:49px;border:0;border-radius:13px;margin-top:20px;color:white;font-weight:800;background:linear-gradient(100deg,#833ab4,#c13584,#f77737)}#msg{min-height:22px;color:#ffb3be;font-size:13px;text-align:center;margin-top:12px}.hint{text-align:center;color:#9a9aa8;font-size:11px;margin-top:15px}
 
 [hidden]{display:none!important}
 :root{--ease:cubic-bezier(.23,1,.32,1);--spring:cubic-bezier(.34,1.56,.64,1)}
@@ -27,7 +27,83 @@ button.submit:disabled{opacity:.6;cursor:progress}
 #msg:not(:empty){animation:shake .4s}
 @keyframes shake{20%{translate:-6px 0}40%{translate:5px 0}60%{translate:-3px 0}80%{translate:2px 0}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-</style></head><body><main class="panel"><div class="brand"><div class="logo"><div class="lens"></div></div><h1>Insta Mode</h1></div><p>فضای مستقل برای عکس‌ها، ویدیوها و لحظه‌های تو</p><div class="tabs"><button id="loginTab" class="active" type="button">ورود</button><button id="registerTab" type="button">ساخت حساب</button></div><form id="authForm"><div id="nameField" hidden><label>نام نمایشی</label><input name="display_name" maxlength="60" placeholder="نامی که دیگران می‌بینند"></div><label id="loginLabel">نام کاربری، ایمیل یا شماره تلفن</label><input name="login" id="login" autocomplete="username" required placeholder="username یا ایمیل / شماره"><div id="identityFields" hidden><label>نام کاربری</label><input name="username" id="username" autocomplete="username" placeholder="username"><label>ایمیل (اختیاری)</label><input name="email" type="email" autocomplete="email" placeholder="name@example.com"><label>شماره تلفن (اختیاری)</label><input name="phone" type="tel" autocomplete="tel" placeholder="شماره تلفن"></div><label>رمز عبور</label><input name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="حداقل ۸ کاراکتر"><button class="submit" id="submit" type="submit">ورود به اینستا</button><div id="msg" role="status"></div></form><div class="hint">حساب اینستا جدا از حساب چت‌روم است.</div></main>
+</style><style>
+
+.tabs{position:relative;isolation:isolate;--i:0}
+.tabs::before{content:"";position:absolute;z-index:-1;top:4px;bottom:4px;width:calc(50% - 4px);inset-inline-start:calc(4px + var(--i)*(50% - 4px));border-radius:9px;background:linear-gradient(100deg,#8538c8,#e83e78);box-shadow:0 8px 18px -8px #e83e78;transition:inset-inline-start .38s var(--spring)}
+.tabs[data-mode=register]{--i:1}
+.tabs button.active{background:none}
+.tabs button{position:relative}
+.panel{box-shadow:0 25px 80px #0008,inset 0 1px 0 #ffffff14}
+input::placeholder{color:#6f6f7c}
+input:hover{border-color:#4a4a58}
+.logo{box-shadow:0 10px 30px -8px #e83e78aa,inset 0 1px 0 #ffffff55}
+@media(prefers-reduced-motion:reduce){.tabs::before{transition:none}}
+.tabs button:focus-visible,button.submit:focus-visible,.pw-eye:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.pw{position:relative}.pw input{padding-inline-end:64px}
+.pw-eye{position:absolute;inset-inline-end:6px;top:50%;translate:0 -50%;height:36px;min-width:52px;border:0;border-radius:9px;background:#ffffff14;color:#d8d8e2;font-size:12px}
+.spin{display:inline-block;width:14px;height:14px;margin-inline-end:8px;vertical-align:-2px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{rotate:360deg}}
+.tabs button{min-height:44px}
+@media(max-width:360px){.panel{padding:24px 16px;border-radius:22px}h1{font-size:24px}}
+</style></head><body><main class="panel"><div class="brand"><div class="logo" aria-hidden="true"><div class="lens"></div></div><h1>Insta Mode</h1></div><p>فضای مستقل برای عکس‌ها، ویدیوها و لحظه‌های تو</p><div class="tabs" role="tablist" aria-label="ورود یا ساخت حساب"><button id="loginTab" class="active" type="button" role="tab" aria-selected="true" aria-controls="authForm">ورود</button><button id="registerTab" type="button" role="tab" aria-selected="false" aria-controls="authForm" tabindex="-1">ساخت حساب</button></div><form id="authForm" role="tabpanel" aria-labelledby="loginTab" novalidate><div id="nameField" hidden><label for="display_name">نام نمایشی</label><input id="display_name" name="display_name" maxlength="60" autocomplete="name" placeholder="نامی که دیگران می‌بینند"></div><label id="loginLabel" for="login">نام کاربری، ایمیل یا شماره تلفن</label><input name="login" id="login" dir="auto" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="username یا ایمیل / شماره"><div id="identityFields" hidden><label for="username">نام کاربری</label><input name="username" id="username" dir="ltr" maxlength="30" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="username"><label for="email">ایمیل (اختیاری)</label><input id="email" name="email" type="email" dir="ltr" autocomplete="email" placeholder="name@example.com"><label for="phone">شماره تلفن (اختیاری)</label><input id="phone" name="phone" type="tel" dir="ltr" autocomplete="tel" placeholder="شماره تلفن"></div><label for="password">رمز عبور</label><div class="pw"><input id="password" name="password" type="password" dir="auto" autocomplete="current-password" minlength="8" required placeholder="حداقل ۸ کاراکتر"><button type="button" class="pw-eye" id="pwEye" aria-label="نمایش رمز عبور" aria-pressed="false">نمایش</button></div><button class="submit" id="submit" type="submit">ورود به اینستا</button><div id="msg" role="alert" aria-live="assertive"></div></form><div class="hint">حساب اینستا جدا از حساب چت‌روم است.</div></main>
 <script>
-(()=>{const $=id=>document.getElementById(id),form=$('authForm');let mode='login';function setMode(m){mode=m;$('loginTab').classList.toggle('active',m==='login');$('registerTab').classList.toggle('active',m==='register');$('loginLabel').hidden=m==='register';$('login').hidden=m==='register';$('login').required=m==='login';$('identityFields').hidden=m!=='register';$('nameField').hidden=m!=='register';$('username').required=m==='register';$('submit').textContent=m==='login'?'ورود به اینستا':'ساخت حساب اینستا';$('msg').textContent=''}$('loginTab').onclick=()=>setMode('login');$('registerTab').onclick=()=>setMode('register');form.onsubmit=async e=>{e.preventDefault();$('submit').disabled=true;$('msg').textContent='';let f=new FormData(form),data={};f.forEach((v,k)=>{if(v)data[k]=v});try{let r=await fetch('/api/insta/auth/'+(mode==='login'?'login':'register'),{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(data)}),d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'خطا در ورود');location.href='/insta'}catch(err){$('msg').textContent=err.message}finally{$('submit').disabled=false}}})();
+(()=>{
+const $=id=>document.getElementById(id),form=$('authForm');
+let mode='login';
+const LABEL={login:'ورود به اینستا',register:'ساخت حساب اینستا'};
+function setMode(m,focus){
+  mode=m;
+  const isLogin=m==='login';
+  for(const [id,on] of [['loginTab',isLogin],['registerTab',!isLogin]]){
+    const t=$(id);t.classList.toggle('active',on);t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;
+  }
+  form.setAttribute('aria-labelledby',isLogin?'loginTab':'registerTab');
+  document.querySelector('.tabs').dataset.mode=m;
+  $('loginLabel').hidden=!isLogin;$('login').hidden=!isLogin;$('login').required=isLogin;
+  if(!isLogin)$('login').value='';                       // a stale value must not be posted in register mode
+  $('identityFields').hidden=isLogin;$('nameField').hidden=isLogin;
+  $('username').required=!isLogin;
+  $('password').autocomplete=isLogin?'current-password':'new-password';   // lets password managers offer to save/generate
+  $('submit').textContent=LABEL[m];$('msg').textContent='';
+  if(focus)(isLogin?$('login'):$('display_name')).focus();
+}
+$('loginTab').onclick=()=>setMode('login',true);
+$('registerTab').onclick=()=>setMode('register',true);
+// arrow-key navigation between tabs (WAI-ARIA tabs pattern; RTL-aware: either arrow switches)
+document.querySelector('.tabs').addEventListener('keydown',e=>{
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+  e.preventDefault();const next=mode==='login'?'register':'login';setMode(next,false);$(next+'Tab').focus();
+});
+$('pwEye').onclick=()=>{
+  const p=$('password'),show=p.type==='password';
+  p.type=show?'text':'password';
+  $('pwEye').textContent=show?'پنهان':'نمایش';
+  $('pwEye').setAttribute('aria-pressed',show);
+  $('pwEye').setAttribute('aria-label',show?'پنهان کردن رمز عبور':'نمایش رمز عبور');
+};
+function fail(msg,el){$('msg').textContent=msg;if(el)el.focus();}
+form.onsubmit=async e=>{
+  e.preventDefault();
+  if(!form.checkValidity()){
+    const bad=form.querySelector(':invalid');
+    return fail(bad&&bad.id==='password'?'رمز عبور باید حداقل ۸ کاراکتر باشد.':'لطفاً فیلدهای لازم را کامل کن.',bad);
+  }
+  const btn=$('submit');btn.disabled=true;btn.setAttribute('aria-busy','true');
+  btn.innerHTML='<span class="spin" aria-hidden="true"></span>لطفاً صبر کن…';
+  $('msg').textContent='';
+  const data={};new FormData(form).forEach((v,k)=>{v=String(v);if(k!=='password')v=v.trim();if(v)data[k]=v});   // never trim the password
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),15000);
+  try{
+    const r=await fetch('/api/insta/auth/'+(mode==='login'?'login':'register'),{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify(data),signal:ctl.signal});
+    let d={};try{d=await r.json()}catch(_){}          // server may answer HTML on 5xx / proxy errors
+    if(!r.ok||!d.ok)throw Error(d.error||(r.status>=500?'مشکل از سمت سرور است؛ کمی بعد دوباره تلاش کن.':'خطا در ورود'));
+    location.href='/insta';
+    return;                                            // keep the button disabled while navigating
+  }catch(err){
+    fail(err.name==='AbortError'?'پاسخی از سرور نیامد. اتصال اینترنت را بررسی کن.':(err instanceof TypeError?'اتصال برقرار نشد. اینترنت را بررسی کن.':err.message));
+  }finally{clearTimeout(timer)}
+  btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent=LABEL[mode];
+};
+})();
 </script></body></html>
