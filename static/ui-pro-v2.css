@@ -1,0 +1,203 @@
+/* ===== ui-pro-v2.css — load AFTER ui-pro.css =====
+   Pure-CSS ports of patterns from: Aceternity UI (aurora, border-beam, spotlight, shimmer),
+   Animate UI (spring press, sliding active pill), shadcn/ui (tokens, ring),
+   Flowbite (inputs, badges, toggles), profile-cards (gradient avatar ring, glass stats),
+   Uiverse (button fx), ui-ux-pro-max (44px targets, motion timing 150-300ms, a11y).
+   Uses only theme vars: --night --deck --raise --line --ink --mute --aril --aril-d --on-aril */
+
+@property --beam{syntax:"<angle>";initial-value:0deg;inherits:false}
+@property --spot-x{syntax:"<percentage>";initial-value:50%;inherits:false}
+@property --spot-y{syntax:"<percentage>";initial-value:0%;inherits:false}
+
+:root{
+  --glass:color-mix(in srgb,var(--deck) 72%,transparent);
+  --glass-line:color-mix(in srgb,var(--ink) 9%,transparent);
+  --glow:color-mix(in srgb,var(--aril) 45%,transparent);
+  --spring:linear(0,.22 6%,.62 14%,.9 24%,1.04 34%,1.06 42%,1.02 56%,1 70%,1);
+  --tap:44px; /* min touch target */
+}
+
+/* ============ 1) AURORA BACKGROUND (Aceternity) ============ */
+.auth-body::before{
+  opacity:.75;
+  background:
+    radial-gradient(45vmax 35vmax at 15% 10%,color-mix(in srgb,var(--aril) 30%,transparent),transparent 65%),
+    radial-gradient(40vmax 32vmax at 90% 25%,color-mix(in srgb,var(--melon,var(--aril-d,var(--aril))) 26%,transparent),transparent 65%),
+    radial-gradient(50vmax 40vmax at 50% 115%,color-mix(in srgb,var(--aril) 22%,transparent),transparent 70%);
+  background-size:140% 140%;
+  animation:aurora 22s ease-in-out infinite alternate;
+}
+@keyframes aurora{
+  0%{background-position:0% 0%,100% 0%,50% 100%}
+  100%{background-position:30% 20%,70% 30%,40% 85%}
+}
+
+/* ============ 2) CARDS: glass + BORDER BEAM (Aceternity) ============ */
+.ig-card{
+  position:relative;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--raise) 40%,var(--glass)),var(--glass));
+  -webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3);
+  border:1px solid var(--glass-line);
+  animation:card-rise .6s var(--ease-out) both;
+}
+.ig-card:not(.slim)::before{
+  content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1.5px;pointer-events:none;
+  background:conic-gradient(from var(--beam),transparent 0 70%,var(--aril) 85%,transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:beam 7s linear infinite;opacity:.9;
+}
+@keyframes beam{to{--beam:360deg}}
+@keyframes card-rise{from{opacity:0;translate:0 16px;scale:.98}}
+
+/* logo: soft breathing glow */
+.ig-brand .mark{filter:drop-shadow(0 0 14px var(--glow));animation:star-turn 48s linear infinite,breathe 4s ease-in-out infinite}
+@keyframes breathe{50%{filter:drop-shadow(0 0 26px var(--glow))}}
+
+/* ============ 3) INPUTS (Flowbite + shadcn) ============ */
+.fl input,.fl textarea{
+  min-height:var(--tap);font-size:16px; /* 16px stops iOS zoom */
+  background:color-mix(in srgb,var(--night) 55%,var(--deck));
+  box-shadow:inset 0 1px 2px color-mix(in srgb,#000 8%,transparent);
+}
+.fl input:focus,.fl textarea:focus{
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--aril) 22%,transparent),0 8px 24px -12px var(--glow);
+}
+.fl input:user-valid:not(:placeholder-shown){border-color:#30a46c}
+
+/* ============ 4) BUTTONS: moving border + spring press (Aceternity/Animate UI/Uiverse) ============ */
+.ig-btn,.key.hot{
+  min-height:var(--tap);font-weight:700;letter-spacing:0;
+  background:linear-gradient(135deg,var(--aril),color-mix(in srgb,var(--aril) 70%,#fff) 50%,var(--aril-d,var(--aril)));
+  background-size:200% 200%;
+  box-shadow:0 12px 28px -12px var(--glow),inset 0 1px 0 color-mix(in srgb,#fff 35%,transparent),inset 0 -2px 0 color-mix(in srgb,#000 14%,transparent);
+  transition:transform .35s var(--spring),box-shadow .25s,background-position .6s var(--ease-out),filter .2s;
+}
+.ig-btn:active,.key:active{transform:scale(.96);transition-duration:.08s}
+@media (hover:hover){
+  .ig-btn:hover,.key.hot:hover{background-position:100% 50%;transform:translateY(-1px);box-shadow:0 16px 34px -12px var(--glow),inset 0 1px 0 color-mix(in srgb,#fff 40%,transparent)}
+}
+/* secondary: ghost button */
+.ig-btn.ghost,.ig-btn.secondary{background:var(--raise);color:var(--ink);box-shadow:none;border:1px solid var(--line)}
+/* loading state: add class .is-loading */
+.ig-btn.is-loading{pointer-events:none;color:transparent}
+.ig-btn.is-loading::before{content:"";position:absolute;inset:0;margin:auto;width:20px;height:20px;border-radius:50%;
+  border:2.5px solid color-mix(in srgb,var(--on-aril,#fff) 35%,transparent);border-top-color:var(--on-aril,#fff);animation:spin .7s linear infinite}
+@keyframes spin{to{rotate:360deg}}
+
+/* divider "or" */
+.ig-or,.ig-divider{color:var(--mute)}
+
+/* ============ 5) BOTTOM TAB BAR  (.nav-bar from chat-plus.css) ============ */
+.nav-bar{
+  background:var(--glass);-webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);
+  border:1px solid var(--glass-line);
+  box-shadow:0 18px 40px -14px color-mix(in srgb,var(--edge-c,#000) 60%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 25%,transparent)}
+.nav-bar button{min-height:var(--tap);transition:background-color .25s,color .2s,scale .35s var(--spring)}
+.nav-bar button:active{scale:.9}
+.nav-bar button.on{background:color-mix(in srgb,var(--aril) 16%,transparent);animation:pill-in .45s var(--spring) both}
+.nav-bar button.on svg,.nav-bar button.on .nav-av{animation:icon-pop .5s var(--spring)}
+.nav-bar .nav-av{box-shadow:0 0 0 2px var(--deck),0 0 0 3.5px var(--line)}
+.nav-bar button.on .nav-av{box-shadow:0 0 0 2px var(--deck),0 0 0 3.5px var(--aril)}
+@keyframes pill-in{from{scale:.85;opacity:.5}}
+@keyframes icon-pop{0%{scale:.7}60%{scale:1.18}100%{scale:1}}
+
+/* FAB */
+.nav-fab{background:linear-gradient(135deg,var(--aril),var(--aril-d,var(--aril)));box-shadow:0 14px 30px -10px var(--glow),inset 0 1px 0 color-mix(in srgb,#fff 35%,transparent);transition:scale .35s var(--spring)}
+.nav-fab::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--aril);opacity:0;animation:fab-ping 3.2s ease-out infinite}
+@keyframes fab-ping{0%{scale:1;opacity:.5}70%,100%{scale:1.55;opacity:0}}
+
+/* ============ 6) CHAT LIST  (.group-item / .group-tile / .badge) ============ */
+.group-item{border-radius:var(--r-md)}
+@keyframes item-in{from{opacity:0;translate:0 10px}}
+.group-item.active{background:linear-gradient(90deg,color-mix(in srgb,var(--aril) 16%,transparent),color-mix(in srgb,var(--aril) 6%,transparent));box-shadow:inset 3px 0 0 var(--aril)}
+.group-tile{box-shadow:0 8px 18px -10px var(--glow),inset 0 1px 0 color-mix(in srgb,#fff 30%,transparent)}
+.group-item .badge{background:var(--aril);color:var(--on-aril,#fff);font-weight:700}
+
+/* ============ 7) STORIES  (.tg-st / .tg-ring / .tg-plus) ============ */
+.tg-ring{background:conic-gradient(from 200deg,var(--aril),color-mix(in srgb,var(--aril) 40%,#ffb454),var(--aril-d,var(--aril)),var(--aril));padding:3px;border-radius:50%;transition:scale .35s var(--spring)}
+.tg-st:active .tg-ring{scale:.92}
+.tg-st.seen .tg-ring,.tg-st.viewed .tg-ring{background:var(--line)}
+.tg-plus{box-shadow:0 0 0 2px var(--deck),0 6px 14px -4px var(--glow)}
+.tg-name{font-weight:600}
+
+/* ============ 8) PROFILE PAGE  (.p-hero / .p-btns / .p-card / .p-tabs) ============ */
+#page-profile,#page-settings,#page-contacts{background:
+  radial-gradient(80% 40% at 50% 0%,color-mix(in srgb,var(--aril) 14%,transparent),transparent 70%),var(--deck)}
+.p-hero .avatar{
+  box-shadow:0 0 0 3px var(--deck),0 0 0 6px var(--aril),0 20px 44px -14px var(--glow);
+  animation:avatar-in .7s var(--spring) both}
+@keyframes avatar-in{from{scale:.6;opacity:0}}
+.p-hero h2{letter-spacing:-.01em}
+.p-status{display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.p-status::before{content:"";width:8px;height:8px;border-radius:50%;background:#30a46c;animation:ping 2s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 #30a46c88}70%,100%{box-shadow:0 0 0 8px #30a46c00}}
+.p-btns button{
+  position:relative;overflow:hidden;min-height:76px;border:1px solid var(--glass-line);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--raise) 85%,transparent),var(--raise));
+  transition:scale .35s var(--spring),box-shadow .25s,border-color .2s}
+.p-btns button::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;
+  background:radial-gradient(120px circle at 50% 0%,color-mix(in srgb,var(--aril) 24%,transparent),transparent 70%)}
+.p-btns button:active{scale:.94}
+@media (hover:hover){.p-btns button:hover{border-color:color-mix(in srgb,var(--aril) 45%,var(--line));box-shadow:var(--sh-2)}.p-btns button:hover::before{opacity:1}}
+.p-card{border:1px solid var(--glass-line);background:color-mix(in srgb,var(--raise) 55%,transparent);border-radius:var(--r-lg)}
+.p-prem{border-radius:var(--r-lg);background:linear-gradient(135deg,color-mix(in srgb,var(--aril) 22%,transparent),color-mix(in srgb,#f5b942 18%,transparent));border:1px solid color-mix(in srgb,var(--aril) 30%,transparent)}
+.p-tabs{padding:4px;border-radius:var(--r-pill);background:var(--raise);width:fit-content;margin-inline:auto}
+.p-tabs button{min-height:40px;border-radius:var(--r-pill);transition:background-color .25s,color .2s,box-shadow .25s}
+.p-tabs button.on{background:var(--aril);color:var(--on-aril,#fff);box-shadow:0 8px 18px -8px var(--glow)}
+
+/* ============ 9) SETTINGS / CONTACTS  (.s-group / .s-item / .s-ico / .c-act / .c-row) ============ */
+.s-group{border-radius:var(--r-lg);border:1px solid var(--glass-line);background:color-mix(in srgb,var(--raise) 55%,transparent);padding:4px}
+.s-title{color:var(--aril);font-weight:700}
+.s-item{min-height:60px;position:relative;overflow:hidden}
+.s-item+.s-item::before{content:"";position:absolute;top:0;inset-inline:62px 12px;height:1px;background:color-mix(in srgb,var(--line) 60%,transparent)}
+.s-item::after{content:"";flex:none;width:8px;height:8px;border-inline-start:2px solid var(--mute);border-block-end:2px solid var(--mute);rotate:45deg;opacity:.5;margin-inline-start:auto}
+[dir=rtl] .s-item::after{rotate:-135deg}
+.s-ico{border-radius:var(--r-md);box-shadow:0 8px 16px -8px currentColor,inset 0 1px 0 color-mix(in srgb,#fff 35%,transparent);transition:scale .35s var(--spring),rotate .35s var(--spring)}
+.s-item:active .s-ico{scale:.9;rotate:-4deg}
+.c-ico{box-shadow:0 8px 18px -8px var(--glow),inset 0 1px 0 color-mix(in srgb,#fff 30%,transparent)}
+.c-row,.c-act{border-radius:var(--r-md)}
+.c-row .avatar{box-shadow:0 0 0 2px var(--deck),0 0 0 3.5px var(--line)}
+.priv-row{border-radius:var(--r-md)}
+.priv-sw{transition:background-color .25s,box-shadow .25s}
+
+/* ============ 10b) POPUPS from chat-plus.js (.pp-*) ============ */
+.pp-sheet,.pp-modal{border-radius:var(--r-lg);background:var(--glass);-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);border:1px solid var(--glass-line);box-shadow:var(--sh-3)}
+.pp-sheet-bg,.pp-modal-bg{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.pp-btn{min-height:var(--tap);border-radius:var(--r-md);transition:scale .35s var(--spring),filter .2s}
+.pp-btn:active{scale:.95}
+.pp-btn.hot{background:linear-gradient(135deg,var(--aril),var(--aril-d,var(--aril)));color:var(--on-aril,#fff);box-shadow:0 10px 24px -12px var(--glow)}
+.pp-toast{border-radius:var(--r-pill);background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--glass-line);box-shadow:var(--sh-2)}
+.pp-field input,.pp-field textarea{border-radius:var(--r-md);min-height:var(--tap);font-size:16px}
+
+/* ============ 11) MESSAGES  (.msg / .bubble) ============ */
+.msg .bubble{border-radius:var(--r-lg)}
+.msg.mine .bubble{background:linear-gradient(135deg,var(--aril),var(--aril-d,var(--aril)));color:var(--on-aril,#fff);box-shadow:0 8px 18px -10px var(--glow)}
+@keyframes msg-in{from{opacity:0;scale:.92;translate:0 8px}}
+.composer{background:var(--glass);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid var(--glass-line)}
+.send{box-shadow:0 10px 22px -10px var(--glow);transition:scale .35s var(--spring)}
+.send:active{scale:.88}
+.key.round:active{scale:.9}
+.pv-grp{border:1px solid var(--glass-line)}
+.pv-ic{box-shadow:0 8px 16px -8px currentColor,inset 0 1px 0 color-mix(in srgb,#fff 35%,transparent);transition:transform .35s var(--spring)}
+.pv-row:active .pv-ic{transform:scale(.9) rotate(-4deg)}
+
+/* ============ 10) TOASTS / MODALS / SKELETON ============ */
+.toast{background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--glass-line);animation:toast-in .5s var(--spring) both}
+@keyframes toast-in{from{opacity:0;translate:0 -14px;scale:.9}}
+.skeleton{border-radius:var(--r-md);background:linear-gradient(100deg,var(--raise) 30%,color-mix(in srgb,var(--ink) 8%,var(--raise)) 50%,var(--raise) 70%);background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
+
+/* ============ 12) PAGE TRANSITIONS (View Transitions API, progressive) ============ */
+@view-transition{navigation:auto}
+::view-transition-old(root){animation:.18s ease-out both vt-out}
+::view-transition-new(root){animation:.28s var(--ease-out) both vt-in}
+@keyframes vt-out{to{opacity:0;scale:.985}}
+@keyframes vt-in{from{opacity:0;translate:0 10px}}
+
+/* ============ reduced motion / a11y ============ */
+@media (prefers-reduced-motion:reduce){
+  .auth-body::before,.ig-card,.ig-card::before,.ig-brand .mark,.group-item,.nav-fab::after,.nav-bar button.on,
+  .nav-bar button.on svg,.nav-bar .nav-badge,.p-hero .avatar,.p-status::before,.msg .bubble,.toast,.skeleton,.group-item .badge{animation:none!important}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+}
