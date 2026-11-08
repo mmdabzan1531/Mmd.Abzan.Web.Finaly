@@ -258,8 +258,31 @@
       themeBtn.parentNode.appendChild(b);
     }
     bind($("#cb-open-me"), openMe);
+    bind($("#open-my-background"), openMe);      /* sidebar button — was never wired in v2 */
     bind($("#cb-open-group"), openGroup);
   }
+
+  /* Menus built by other scripts (⋮ menu, settings dialog, bottom-nav sheet) often clone or re-create their buttons,
+     so listeners bound above never reach the copies. One delegated listener catches every entry point by id or label.
+     openPicker() already ignores a second call while the picker is open, so double-firing is harmless. */
+  var FA_DIGITS = /[\u200c\u200f\u200e]/g;
+  function labelOf(el) { return (el.textContent || "").replace(FA_DIGITS, "").replace(/\s+/g, " ").trim(); }
+  document.addEventListener("click", function (e) {
+    var t = e.target; if (!t || !t.closest || t.closest(".cb-ov")) return;
+    var hit = t.closest("#open-my-background,#cb-open-me,[data-open-background]");
+    var isGroupBtn = t.closest("#cb-open-group");
+    if (isGroupBtn) return;                         /* group picker keeps its own handler */
+    if (!hit) {
+      var item = t.closest("button,a,li,[role=menuitem],[role=button],.menu-item");
+      if (item) {
+        var lbl = labelOf(item);
+        if (lbl.length <= 40 && /پس.زمینه (من|چت)/.test(lbl) && lbl.indexOf("گروه") === -1) hit = item;
+      }
+    }
+    if (!hit) return;
+    e.preventDefault();
+    setTimeout(openMe, 30);                         /* let the menu close first so focus/overlay order is clean */
+  }, true);
 
   /* ================= شروع ================= */
   document.addEventListener("cr:group", apply);
