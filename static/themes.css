@@ -13,7 +13,7 @@ html[data-theme=esfand]{color-scheme:light;--night:#f5f1ff;--deck:#ffffff;--rais
 html[data-theme=shen]{color-scheme:light;--night:#f7f1e6;--deck:#fffdf8;--raise:#efe5d1;--line:#dccfb2;--ink:#2b2110;--mute:#7d6c4a;--aril:#b45309;--aril-d:#78350f;--on-aril:#fff;--melon:#92400e;--pista:#3f6212;--on-pista:#fff;--edge-c:#cdbd97;--tile:none}
 html[data-theme=gol]{color-scheme:light;--night:#fff1f4;--deck:#ffffff;--raise:#ffe0e8;--line:#ffc2d1;--ink:#3a0f1d;--mute:#9a5a6e;--aril:#e11d48;--aril-d:#9f1239;--on-aril:#fff;--melon:#be123c;--pista:#0e7490;--on-pista:#fff;--edge-c:#f0a9bd;--tile:none}
 /* picker layout */
-.pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .pick-grid .pick{margin-top:0;min-width:0}
 .pick-grid.fonts{grid-template-columns:1fr}
 .pick .sw+span strong{font-size:14px}
@@ -25,3 +25,13 @@ html[data-theme=gol]{color-scheme:light;--night:#fff1f4;--deck:#ffffff;--raise:#
 .card .side-sec{padding:14px 2px 6px}
 /* silver: matches the logo (black + brushed silver) */
 html[data-theme=silver]{color-scheme:dark;--night:#000;--deck:#0a0a0c;--raise:#151519;--line:#26262c;--ink:#ededf0;--mute:#8e8e98;--aril:#c4c7ce;--aril-d:#6c6f78;--on-aril:#0a0a0b;--melon:#e9ebef;--pista:#a6e9cf;--on-pista:#04130d;--warn:#ffc857;--edge-c:#000;--tile:none}
+
+/* --- a11y / polish --- */
+.pick:focus-visible,.font-opt:focus-visible,.fsize input:focus-visible{outline:2px solid var(--aril);outline-offset:2px}
+.pick.on[aria-pressed=true]{box-shadow:0 0 0 2px var(--aril) inset}
+.pick{transition:box-shadow .2s,transform .12s}.pick:active{transform:scale(.98)}
+.modal .card:focus{outline:none}
+@media (prefers-reduced-motion:reduce){.pick{transition:none}}
+/* fallback so --warn exists in every theme (only silver defined it) */
+html[data-theme]{--warn:#ffc857}
+html[data-theme=barf],html[data-theme=nane],html[data-theme=esfand],html[data-theme=shen],html[data-theme=gol]{--warn:#b45309}
