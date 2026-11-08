@@ -70,12 +70,7 @@ html[data-theme=silver] .ig-btn,html[data-theme=silver] .key.hot{
 .modal{backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);background:color-mix(in srgb,var(--edge-c,#000) 62%,transparent)}
 .modal .card{border-radius:var(--r-lg);background:var(--deck);border:1px solid var(--line);box-shadow:var(--sh-3);max-height:min(88dvh,820px);overflow:auto;overscroll-behavior:contain}
 .modal.show .card{animation:sheet-in .42s var(--ease-spring) both}
-@keyframes sheet-in{from{opacity:0;translate:0 28px;scale:.97}}
-@media (max-width:640px){
-  .modal .card{border-end-start-radius:0;border-end-end-radius:0;padding-bottom:max(16px,env(safe-area-inset-bottom))}
-  .modal.show .card{animation-name:sheet-up}
-  @keyframes sheet-up{from{translate:0 100%}}
-}
+@keyframes sheet-in{from{opacity:0;translate:0 18px;scale:.97}}
 .modal .card input:not([type=checkbox]):not([type=range]):not([type=file]),.modal .card textarea{border-radius:var(--r-md)}
 .modal .card h2{letter-spacing:-.01em}
 
@@ -123,3 +118,5 @@ html[data-theme=silver] .ig-btn,html[data-theme=silver] .key.hot{
 }
 @media (prefers-contrast:more){:root{--line:color-mix(in srgb,var(--ink) 40%,transparent)}}
 @media (forced-colors:active){.ig-btn,.key,.pick{border:1px solid ButtonText}}
+
+.modal:not(.show){pointer-events:none}
