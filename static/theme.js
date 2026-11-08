@@ -100,29 +100,43 @@
   }
   function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
   apply();
+  window.addEventListener("storage", function (e) { if (e.key === KEY || e.key === FKEY || e.key === SKEY) apply(); });
   if (mq) (mq.addEventListener ? mq.addEventListener("change", apply) : mq.addListener(apply));
 
+  var lastFocus = null;
+  function closeModal() {
+    var el = document.getElementById("cr-modal");
+    if (!el || !el.classList.contains("show")) return;
+    el.classList.remove("show");
+    if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} }
+    lastFocus = null;
+  }
   function modal(title, node) {
     var el = document.getElementById("cr-modal");
     if (!el) {
       el = document.createElement("div"); el.className = "modal"; el.id = "cr-modal";
-      el.innerHTML = '<section class="card"><h2></h2><div class="cr-body"></div><div class="actions"><button type="button" class="key">بستن</button></div></section>';
+      el.innerHTML = '<section class="card" role="dialog" aria-modal="true" aria-labelledby="cr-modal-title" tabindex="-1"><h2 id="cr-modal-title"></h2><div class="cr-body"></div><div class="actions"><button type="button" class="key">بستن</button></div></section>';
       document.body.appendChild(el);
-      el.addEventListener("click", function (e) { if (e.target === el || e.target.closest(".actions .key")) el.classList.remove("show"); });
-      document.addEventListener("keydown", function (e) { if (e.key === "Escape") el.classList.remove("show"); });
+      el.addEventListener("click", function (e) { if (e.target === el || e.target.closest(".actions .key")) closeModal(); });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
     }
+    lastFocus = document.activeElement;
     el.querySelector("h2").textContent = title;
     var body = el.querySelector(".cr-body"); body.innerHTML = ""; body.appendChild(node);
     el.classList.add("show");
+    var card = el.querySelector(".card");
+    var on = body.querySelector(".on") || card;
+    try { on.scrollIntoView({block: "nearest"}); on.focus({preventScroll: true}); } catch (e) {}
   }
 
   function heading(t) { var h = document.createElement("div"); h.className = "side-sec"; h.textContent = t; return h; }
   function themeBtn(o, box) {
     var b = document.createElement("button"); b.type = "button";
     b.className = "pick theme-opt" + (pref() === o.id ? " on" : "");
+    b.setAttribute("aria-pressed", pref() === o.id ? "true" : "false");
     b.innerHTML = '<span class="sw">' + o.sw.map(function (c) { return '<i style="background:' + c + '"></i>'; }).join("") +
       '</span><span><strong>' + o.name + '</strong><small>' + o.sub + '</small></span>';
-    b.onclick = function () { set(o.id); box.querySelectorAll(".theme-opt").forEach(function (x) { x.classList.toggle("on", x === b); }); };
+    b.onclick = function () { set(o.id); box.querySelectorAll(".theme-opt").forEach(function (x) { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b ? "true" : "false"); }); };
     return b;
   }
   function openPicker() {
@@ -146,11 +160,11 @@
     var grid = document.createElement("div"); grid.className = "pick-grid fonts"; box.appendChild(grid);
     FONTS.forEach(function (f) {
       loadFont(f);
-      var b = document.createElement("button"); b.type = "button";
+      var b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", fontPref() === f[0] ? "true" : "false");
       b.className = "pick font-opt" + (fontPref() === f[0] ? " on" : "");
       b.style.fontFamily = stack(f);
       b.innerHTML = '<span><strong>' + f[1] + '</strong><small>سلام، این یک متن نمونه است ۱۲۳</small></span>';
-      b.onclick = function () { setFont(f[0]); grid.querySelectorAll(".font-opt").forEach(function (x) { x.classList.toggle("on", x === b); }); };
+      b.onclick = function () { setFont(f[0]); grid.querySelectorAll(".font-opt").forEach(function (x) { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b ? "true" : "false"); }); };
       grid.appendChild(b);
     });
     modal("فونت برنامه", box);
@@ -161,5 +175,5 @@
   });
   window.CRTheme = {fonts: FONTS, getFont: fontPref, setFont: setFont, set: set, get: pref, openPicker: openPicker,
                     openFontPicker: openFontPicker, themes: THEMES, setSize: setSize, getSize: sizePref};
-  window.CRModal = modal;
+  window.CRModal = modal; window.CRModal.close = closeModal;
 })();
