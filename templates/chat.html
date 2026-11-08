@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="fa" dir="rtl"><head><title>Chatroom | محمد مهدی آبزن</title>{% include "_head.html" %}<link rel="stylesheet" href="{{ url_for('static', filename='chat-plus.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='attach.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='chat-nav.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='stories.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='chat-polish.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='luxe.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='motion.css') }}?v={{ ASSET_V }}"></head>
+<html lang="fa" dir="rtl"><head><title>Chatroom | محمد مهدی آبزن</title>{% include "_head.html" %}<link rel="stylesheet" href="{{ url_for('static', filename='chat-plus.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='attach.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='chat-nav.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='stories.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='chat-polish.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='luxe.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='motion.css') }}?v={{ ASSET_V }}"><link rel="stylesheet" href="{{ url_for('static', filename='ui-pro.css') }}?v={{ ASSET_V }}"></head>
 <body class="chat-body">
 <svg width="0" height="0" style="position:absolute"><symbol id="star" viewBox="0 0 48 48"><polygon fill="currentColor" points="24,2 28.97,11.99 39.56,8.44 36.01,19.03 46,24 36.01,28.97 39.56,39.56 28.97,36.01 24,46 19.03,36.01 8.44,39.56 11.99,28.97 2,24 11.99,19.03 8.44,8.44 19.03,11.99"/><circle cx="24" cy="24" r="5" fill="var(--night)"/></symbol></svg>
 <div class="app">
   <aside class="side" id="sidebar">
-    <div class="side-head tg-head"><div class="tg-title" id="tg-title" data-state="connecting"><span id="tg-title-text">Chatroom</span></div><button type="button" class="tg-more" id="tg-more" aria-label="منو"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button><div class="side-tools"><span hidden><button class="key small" data-install-btn hidden>نصب</button><button class="key round small hot" id="open-create-group" title="گروه جدید" aria-label="گروه جدید">+</button></span></div></div>
+    <div class="side-head tg-head"><div class="tg-title" id="tg-title" data-state="connecting"><span id="tg-title-text">Chatroom</span></div><button type="button" class="tg-more" id="tg-more" aria-label="منو" aria-haspopup="menu" aria-controls="chat-overflow-menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button><div class="side-tools"><span hidden><button class="key small" data-install-btn hidden>نصب</button><button class="key round small hot" id="open-create-group" title="گروه جدید" aria-label="گروه جدید">+</button></span></div></div>
     <div class="chat-overflow-menu" id="chat-overflow-menu" hidden role="menu" aria-label="منوی اصلی">
       <a href="/chat" role="menuitem">💬 <span>چت‌روم و گفتگوها</span></a>
       <button type="button" data-overflow-action="contacts" role="menuitem">👥 <span>مخاطبین</span></button>
@@ -37,7 +37,7 @@
     <div class="attach-bar" id="attach-bar" hidden><span class="attach-ico" id="attach-ico">📎</span><div class="attach-info" data-no-i18n><b id="attach-name"></b><small id="attach-size"></small></div><button type="button" class="key round small" id="attach-cancel" aria-label="لغو">✕</button></div>
     <form class="composer" id="message-form">
       <button type="button" class="key round attach-btn" id="attach-btn" aria-label="پیوست" data-pp-toggle data-no-emoji><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button><input type="file" id="attach-input" hidden>
-      <textarea id="message-input" dir="auto" rows="1" maxlength="1000" placeholder="پیامت را بنویس…" aria-label="متن پیام"></textarea>
+      <textarea id="message-input" dir="auto" rows="1" maxlength="1000" enterkeyhint="send" autocapitalize="sentences" placeholder="پیامت را بنویس…" aria-label="متن پیام"></textarea>
       <button type="button" class="key round emoji-btn" id="emoji-btn" aria-label="ایموجی" data-pp-toggle data-no-emoji><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><circle cx="9" cy="10" r=".6" fill="currentColor"/><circle cx="15" cy="10" r=".6" fill="currentColor"/><path d="M8.3 14.4c.9 1.5 2.2 2.2 3.7 2.2s2.8-.7 3.7-2.2"/></svg></button>
       <button class="key hot round send" type="submit" id="send-button" aria-label="ارسال">➤</button>
     </form>
@@ -65,11 +65,16 @@
     <span class="chat-nav-icon" aria-hidden="true">☺</span><span>پروفایل</span>
   </button>
 </nav>
+<script>
+(function(){var n=document.getElementById("chat-bottom-nav");if(!n||!window.MutationObserver)return;
+function sync(){n.querySelectorAll(".chat-nav-item").forEach(function(b){if(b.classList.contains("is-active"))b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")})}
+new MutationObserver(sync).observe(n,{subtree:true,attributes:true,attributeFilter:["class"]});sync()})();
+</script>
 <div class="menu" id="msg-menu" role="menu"></div>
-<div class="lightbox" id="lightbox" hidden role="dialog" aria-label="عکس"><img id="lightbox-img" alt=""></div>
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="نمایش عکس (برای بستن Esc یا ضربه بزن)"><img id="lightbox-img" alt=""></div>
 <div class="toast" id="toast" role="status"></div>
 
-<div class="modal" id="profile-modal"><section class="card"><h2>تنظیمات</h2>
+<div class="modal" id="profile-modal"><section role="dialog" aria-modal="true" class="card"><h2>تنظیمات</h2>
   <label>عکس پروفایل</label><input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small>PNG، JPG، WEBP یا GIF تا ۴ مگابایت</small>
   <label>ایموجی (وقتی عکس نداری)</label><input id="profile-avatar" maxlength="12" value="{{ current_user.avatar }}">
   <label>نام نمایشی</label><input id="profile-name" maxlength="32" value="{{ current_user.display_name }}">
@@ -81,9 +86,9 @@
   <div class="row2"><input type="checkbox" id="profile-show-email" {{ "checked" if current_user.show_email }}><label for="profile-show-email">نمایش ایمیل در پروفایل</label></div>
   <div hidden><div class="row2"><button type="button" class="key small" id="theme-open">🎨 تم‌ها</button><button type="button" class="key small" id="font-open">🔤 فونت‌ها</button><button type="button" class="key small" id="cb-open-me">🖼 پس‌زمینه چت</button></div>  <div class="row2"><a class="key small" href="/support#support">🛟 پشتیبانی</a><a class="key small" href="/about#about">ℹ درباره ما</a></div>  </div>
   <div class="actions"><button class="key" data-close="profile-modal">بستن</button><button class="key hot" id="save-profile">ذخیره</button></div><p class="status" id="profile-status"></p></section></div>
-<div class="modal" id="user-view-modal"><section class="card center"><div class="avatar xl" id="view-user-avatar">🙂</div><h2 id="view-user-name" data-no-i18n></h2><p class="handle" id="view-user-id" data-no-i18n></p><p class="bio" id="view-user-bio" data-no-i18n></p><div class="contact" id="view-contact"></div><div class="actions"><button class="key" data-close="user-view-modal">بستن</button><button class="key hot" id="view-dm">ارسال پیام</button></div></section></div>
-<div class="modal" id="create-group-modal"><section class="card"><h2>گروه جدید</h2><label>نام گروه</label><input id="new-group-name" maxlength="40" placeholder="مثلاً گپ برنامه‌نویسی"><label>توضیحات</label><textarea id="new-group-description" maxlength="180" rows="3"></textarea><div class="actions"><button class="key" data-close="create-group-modal">بستن</button><button class="key hot" id="create-group-submit">ساخت گروه</button></div><p class="status" id="create-group-status"></p></section></div>
-<div class="modal" id="group-modal"><section class="card"><h2>ویرایش و تنظیمات گروه</h2><p class="status" style="margin:0 0 12px">تغییرات این بخش برای همه اعضای گروه اعمال می‌شود.</p>
+<div class="modal" id="user-view-modal"><section role="dialog" aria-modal="true" class="card center"><div class="avatar xl" id="view-user-avatar">🙂</div><h2 id="view-user-name" data-no-i18n></h2><p class="handle" id="view-user-id" data-no-i18n></p><p class="bio" id="view-user-bio" data-no-i18n></p><div class="contact" id="view-contact"></div><div class="actions"><button class="key" data-close="user-view-modal">بستن</button><button class="key hot" id="view-dm">ارسال پیام</button></div></section></div>
+<div class="modal" id="create-group-modal"><section role="dialog" aria-modal="true" class="card"><h2>گروه جدید</h2><label>نام گروه</label><input id="new-group-name" maxlength="40" placeholder="مثلاً گپ برنامه‌نویسی"><label>توضیحات</label><textarea id="new-group-description" maxlength="180" rows="3"></textarea><div class="actions"><button class="key" data-close="create-group-modal">بستن</button><button class="key hot" id="create-group-submit">ساخت گروه</button></div><p class="status" id="create-group-status"></p></section></div>
+<div class="modal" id="group-modal"><section role="dialog" aria-modal="true" class="card"><h2>ویرایش و تنظیمات گروه</h2><p class="status" style="margin:0 0 12px">تغییرات این بخش برای همه اعضای گروه اعمال می‌شود.</p>
   <div style="display:flex;justify-content:center;margin:4px 0 12px"><div class="avatar xl" id="group-photo-preview">👥</div></div>
   <div id="group-photo-wrap"><label>عکس گروه</label><input id="group-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small>PNG، JPG، WEBP یا GIF تا ۴ مگابایت</small>
   <div class="row2"><button type="button" class="key small del" id="group-photo-remove">حذف عکس</button></div></div>
@@ -94,7 +99,7 @@
   <label>پس‌زمینه گروه</label><div class="row2"><button type="button" class="key small" id="cb-open-group">🖼 انتخاب عکس یا تم برای همه اعضا</button></div><small>پس‌زمینه شخصی اعضا با این گزینه تغییر نمی‌کند؛ فقط ظاهر همین گروه عوض می‌شود.</small>
   <div class="row2 group-extra"><button type="button" class="key small" id="reset-invite">لینک دعوت جدید</button><button type="button" class="key small" id="leave-group">ترک گروه</button><button type="button" class="key small del" id="delete-group">حذف گروه</button></div>
   <div class="actions"><button class="key" data-close="group-modal">بستن</button><button class="key hot" id="save-group">ذخیره</button></div><p class="status" id="group-status"></p></section></div>
-<div class="modal" id="sheet"><section class="card"><h2 id="sheet-title"></h2><div id="sheet-body"></div><div class="actions" id="sheet-actions"></div></section></div>
+<div class="modal" id="sheet"><section role="dialog" aria-modal="true" class="card"><h2 id="sheet-title"></h2><div id="sheet-body"></div><div class="actions" id="sheet-actions"></div></section></div>
 
 <script>
 /* phones: show the chat list immediately (before chat.js/chat-nav.js finish loading) unless an invite link points at a group */
@@ -143,7 +148,7 @@ window.CHATROOM = {
   function $(sel, el) { return (el || document).querySelector(sel); }
 
   var PRIV = {}, COUNTS = {blocked: 0, close_friends: 0, hide_story: 0};
-  var root, view, stack = [], navBusy = false, saving = {};
+  var root, view, stack = [], navBusy = false, saving = {}, lastFocus = null;
   var PROFILE_CB = {show_phone: "profile-show-phone", show_email: "profile-show-email", show_birthday: "profile-show-birthday"};
   var DM_LABEL = {everyone: "همه", contacts: "فقط مخاطبین", nobody: "هیچ‌کس"};
 
@@ -187,53 +192,56 @@ window.CHATROOM = {
     s.textContent = [
       "#pv-ov{position:fixed;inset:0;z-index:99998;background:rgba(20,16,24,0);display:flex;align-items:center;justify-content:center;padding:12px;transition:background .3s;-webkit-tap-highlight-color:transparent}",
       "#pv-ov.on{background:rgba(20,16,24,.55)}#pv-ov[hidden]{display:none}",
-      "#pv-card{position:relative;background:var(--card,#fff);color:var(--ink,#3b1f2b);width:100%;max-width:470px;height:min(88vh,700px);border-radius:30px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.4);font-family:inherit;transform:translateY(40px) scale(.94);opacity:0;transition:transform .42s cubic-bezier(.2,1.1,.3,1),opacity .25s}",
+      "#pv-card{position:relative;background:var(--card,var(--deck,#fff));color:var(--ink,#3b1f2b);color-scheme:inherit;width:100%;max-width:470px;height:min(88vh,700px);border-radius:30px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.4);font-family:inherit;transform:translateY(40px) scale(.94);opacity:0;transition:transform .42s cubic-bezier(.2,1.1,.3,1),opacity .25s}",
       "#pv-ov.on #pv-card{transform:none;opacity:1}",
       ".pv-pg{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:0 0 24px;background:inherit;transition:transform .38s cubic-bezier(.22,.9,.3,1),opacity .3s;will-change:transform}",
       ".pv-pg.in-f{transform:translateX(-100%)}.pv-pg.in-b{transform:translateX(30%);opacity:.4}",
       ".pv-pg.out-f{transform:translateX(30%);opacity:.4}.pv-pg.out-b{transform:translateX(-100%)}",
-      ".pv-hd{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;padding:16px 16px 10px;background:var(--card,#fff)}",
-      ".pv-hd h2{flex:1;margin:0;font-size:22px}.pv-ib{border:0;background:rgba(160,90,120,.12);color:inherit;width:38px;height:38px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .15s,background .2s}",
-      ".pv-ib:active{transform:scale(.88)}.pv-ib.rot{transform:rotate(45deg);background:rgba(214,69,110,.18)}",
+      ".pv-hd{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;padding:16px 16px 10px;background:var(--card,var(--deck,#fff))}",
+      ".pv-hd h2{flex:1;margin:0;font-size:22px}.pv-ib{border:0;background:color-mix(in srgb,var(--mute,#a05a78) 12%,transparent);color:inherit;width:38px;height:38px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .15s,background .2s}",
+      ".pv-ib:active{transform:scale(.88)}.pv-ib.rot{transform:rotate(45deg);background:color-mix(in srgb,var(--accent,var(--aril,#d6456e)) 18%,transparent)}",
       ".pv-sec{margin:14px 18px 4px;font-size:13px;font-weight:700;opacity:.6}.pv-note{margin:6px 20px 10px;font-size:13px;line-height:1.8;opacity:.7}",
-      ".pv-grp{margin:0 12px;border-radius:22px;background:rgba(214,69,110,.06);overflow:hidden}",
+      ".pv-grp{margin:0 12px;border-radius:22px;background:color-mix(in srgb,var(--accent,var(--aril,#d6456e)) 6%,transparent);overflow:hidden}",
       ".pv-row{display:flex;align-items:center;gap:13px;padding:13px 14px;cursor:pointer;position:relative;transition:background .18s,transform .15s;user-select:none}",
-      ".pv-row:active{background:rgba(214,69,110,.12)}.pv-row+.pv-row:before{content:'';position:absolute;top:0;inset-inline:14px;height:1px;background:rgba(160,90,120,.16)}",
+      ".pv-row:active{background:color-mix(in srgb,var(--accent,var(--aril,#d6456e)) 12%,transparent)}.pv-row+.pv-row:before{content:'';position:absolute;top:0;inset-inline:14px;height:1px;background:color-mix(in srgb,var(--mute,#a05a78) 16%,transparent)}",
       ".pv-ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:19px;color:#fff;filter:saturate(1.1)}",
       ".pv-tx{flex:1;min-width:0}.pv-tx b{display:block;font-size:15.5px}.pv-tx small{display:block;margin-top:2px;font-size:12.5px;line-height:1.7;opacity:.68}",
       ".pv-val{font-size:13.5px;opacity:.65;white-space:nowrap}.pv-chev{opacity:.4;font-size:22px;line-height:1;transform:translateY(-1px)}",
       ".pv-row.shake{animation:pvshake .4s}@keyframes pvshake{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}",
       /* ---- animated switch ---- */
       ".pv-sw{flex:none;position:relative;width:56px;height:32px;display:block;margin:0}.pv-sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:2;width:100%;height:100%}",
-      ".pv-tr{position:absolute;inset:0;border-radius:32px;background:#cfc6cb;transition:background .35s,box-shadow .35s;box-shadow:inset 0 0 0 0 rgba(0,0,0,.0)}",
+      ".pv-tr{position:absolute;inset:0;border-radius:32px;background:color-mix(in srgb,var(--mute,#8f8590) 45%,transparent);transition:background .35s,box-shadow .35s;box-shadow:inset 0 0 0 0 rgba(0,0,0,.0)}",
       ".pv-th{position:absolute;top:3px;right:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:grid;place-items:center;transition:right .42s cubic-bezier(.34,1.56,.64,1),width .2s,transform .3s}",
       ".pv-th svg{position:absolute;width:15px;height:15px;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .25s}",
-      ".pv-th .k{opacity:0;transform:scale(.2) rotate(-90deg);stroke:var(--accent,#d6456e)}.pv-th .x{opacity:1;stroke:#9b8f95}",
+      ".pv-th .k{opacity:0;transform:scale(.2) rotate(-90deg);stroke:var(--accent,var(--aril,#d6456e))}.pv-th .x{opacity:1;stroke:#9b8f95}",
       ".pv-sw input:active~.pv-th{width:34px}.pv-sw input:checked:active~.pv-th{width:34px}",
-      ".pv-sw input:checked~.pv-tr{background:var(--accent,#d6456e);box-shadow:0 0 18px rgba(214,69,110,.45)}",
+      ".pv-sw input:checked~.pv-tr{background:var(--accent,var(--aril,#d6456e));box-shadow:0 0 18px color-mix(in srgb,var(--accent,var(--aril,#d6456e)) 45%,transparent)}",
       ".pv-sw input:checked~.pv-th{right:calc(100% - 29px)}",
       ".pv-sw input:checked~.pv-th .k{opacity:1;transform:none}.pv-sw input:checked~.pv-th .x{opacity:0;transform:scale(.2) rotate(90deg)}",
       ".pv-sw input:disabled{cursor:progress}.pv-sw.busy .pv-th{animation:pvpulse .8s infinite}@keyframes pvpulse{50%{transform:scale(.82)}}",
-      ".pv-sw:after{content:'';position:absolute;inset:-2px;border-radius:34px;pointer-events:none;border:2px solid var(--accent,#d6456e);opacity:0}",
+      ".pv-sw:after{content:'';position:absolute;inset:-2px;border-radius:34px;pointer-events:none;border:2px solid var(--accent,var(--aril,#d6456e));opacity:0}",
       ".pv-sw.pop:after{animation:pvring .55s ease-out}@keyframes pvring{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(1.35,1.9)}}",
       /* ---- radio ---- */
       ".pv-rd{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid #b9aeb4;position:relative;transition:border-color .25s}",
-      ".pv-rd:after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--accent,#d6456e);transform:scale(0);transition:transform .35s cubic-bezier(.34,1.8,.64,1)}",
-      ".pv-row.sel .pv-rd{border-color:var(--accent,#d6456e)}.pv-row.sel .pv-rd:after{transform:scale(1)}",
+      ".pv-rd:after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--accent,var(--aril,#d6456e));transform:scale(0);transition:transform .35s cubic-bezier(.34,1.8,.64,1)}",
+      ".pv-row.sel .pv-rd{border-color:var(--accent,var(--aril,#d6456e))}.pv-row.sel .pv-rd:after{transform:scale(1)}",
       /* ---- user rows ---- */
-      ".pv-av{flex:none;width:46px;height:46px;border-radius:50%;background:rgba(214,69,110,.14);display:grid;place-items:center;font-size:24px;overflow:hidden}.pv-av img{width:100%;height:100%;object-fit:cover}",
+      ".pv-av{flex:none;width:46px;height:46px;border-radius:50%;background:color-mix(in srgb,var(--accent,var(--aril,#d6456e)) 14%,transparent);display:grid;place-items:center;font-size:24px;overflow:hidden}.pv-av img{width:100%;height:100%;object-fit:cover}",
       ".pv-u{display:flex;align-items:center;gap:12px;padding:8px 18px;max-height:80px;overflow:hidden;transition:max-height .35s,opacity .3s,transform .35s,padding .35s}",
       ".pv-u.gone{max-height:0;opacity:0;transform:translateX(60px);padding-top:0;padding-bottom:0}.pv-u.new{animation:pvin .45s cubic-bezier(.2,1.2,.3,1)}@keyframes pvin{from{opacity:0;transform:translateY(-14px) scale(.96)}}",
       ".pv-u .pv-tx small{direction:ltr;text-align:right}",
-      ".pv-btn{flex:none;border:0;border-radius:14px;padding:9px 15px;background:var(--accent,#d6456e);color:#fff;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;transition:transform .15s,opacity .2s}",
-      ".pv-btn:active{transform:scale(.92)}.pv-btn.sec{background:rgba(214,69,110,.14);color:var(--accent,#d6456e)}.pv-btn:disabled{opacity:.5}",
+      ".pv-btn{flex:none;border:0;border-radius:14px;padding:9px 15px;background:var(--accent,var(--aril,#d6456e));color:#fff;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;transition:transform .15s,opacity .2s}",
+      ".pv-btn:active{transform:scale(.92)}.pv-btn.sec{background:color-mix(in srgb,var(--accent,var(--aril,#d6456e)) 14%,transparent);color:var(--accent,var(--aril,#d6456e))}.pv-btn:disabled{opacity:.5}",
       ".pv-addp{overflow:hidden;max-height:0;opacity:0;transition:max-height .4s ease,opacity .3s;padding:0 18px}.pv-addp.open{max-height:520px;opacity:1;padding:4px 18px 8px}",
-      ".pv-addp input{width:100%;box-sizing:border-box;border:1.5px solid rgba(160,90,120,.35);border-radius:16px;padding:11px 14px;font:inherit;background:transparent;color:inherit;outline:0;transition:border-color .2s,box-shadow .2s}",
-      ".pv-addp input:focus{border-color:var(--accent,#d6456e);box-shadow:0 0 0 4px rgba(214,69,110,.14)}",
+      ".pv-addp input{width:100%;box-sizing:border-box;border:1.5px solid color-mix(in srgb,var(--mute,#a05a78) 35%,transparent);border-radius:16px;padding:11px 14px;font:inherit;background:transparent;color:inherit;outline:0;transition:border-color .2s,box-shadow .2s}",
+      ".pv-addp input:focus{border-color:var(--accent,var(--aril,#d6456e));box-shadow:0 0 0 4px color-mix(in srgb,var(--accent,var(--aril,#d6456e)) 14%,transparent)}",
       ".pv-emp{text-align:center;padding:34px 24px;opacity:.6;font-size:14px;line-height:1.9}.pv-emp i{display:block;font-style:normal;font-size:40px;margin-bottom:6px;animation:pvfloat 2.6s ease-in-out infinite}@keyframes pvfloat{50%{transform:translateY(-6px)}}",
       "#pv-toast{position:absolute;bottom:18px;left:50%;transform:translate(-50%,30px);opacity:0;background:#2b1a22;color:#fff;padding:10px 18px;border-radius:30px;font-size:13.5px;z-index:9;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.2,.3,1),opacity .25s;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}",
       "#pv-toast.show{opacity:1;transform:translate(-50%,0)}#pv-toast.bad{background:#b3261e}",
-      ".pv-sk{height:56px;margin:8px 18px;border-radius:16px;background:linear-gradient(90deg,rgba(160,90,120,.08),rgba(160,90,120,.18),rgba(160,90,120,.08));background-size:200% 100%;animation:pvsk 1.2s infinite}@keyframes pvsk{to{background-position:-200% 0}}",
+      ".pv-sk{height:56px;margin:8px 18px;border-radius:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--mute,#a05a78) 8%,transparent),color-mix(in srgb,var(--mute,#a05a78) 18%,transparent),color-mix(in srgb,var(--mute,#a05a78) 8%,transparent));background-size:200% 100%;animation:pvsk 1.2s infinite}@keyframes pvsk{to{background-position:-200% 0}}",
+      ".pv-row:focus-visible,.pv-ib:focus-visible,.pv-btn:focus-visible,.pv-addp input:focus-visible,#pv-card:focus-visible{outline:2px solid var(--accent,var(--aril,#d6456e));outline-offset:-2px}",
+      ".pv-sw:focus-within{outline:2px solid var(--accent,var(--aril,#d6456e));outline-offset:3px;border-radius:34px}",
+      "#pv-card{outline:none;padding-bottom:env(safe-area-inset-bottom)}.pv-ib{min-width:44px;min-height:44px}",
       "@media (prefers-reduced-motion:reduce){#pv-card *,#pv-card{transition-duration:.01s!important;animation:none!important}}"
     ].join("\n");
     document.head.appendChild(s);
@@ -242,14 +250,14 @@ window.CHATROOM = {
   /* ---------- building blocks ---------- */
   var SVG_K = '<svg class="k" viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   var SVG_X = '<svg class="x" viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>';
-  function sw(key, on) {
-    return '<label class="pv-sw" data-sw="' + key + '"><input type="checkbox" data-k="' + key + '"' + (on ? " checked" : "") + '><span class="pv-tr"></span><span class="pv-th">' + SVG_K + SVG_X + "</span></label>";
+  function sw(key, on, title) {
+    return '<label class="pv-sw" data-sw="' + key + '"><input type="checkbox" role="switch" data-k="' + key + '" aria-label="' + esc(title || key) + '"' + (on ? " checked" : "") + '><span class="pv-tr"></span><span class="pv-th">' + SVG_K + SVG_X + "</span></label>";
   }
   function swRow(key, ic, bg, title, desc) {
-    return '<div class="pv-row" data-row="' + key + '">' + icon(bg, ic) + '<div class="pv-tx"><b>' + esc(title) + "</b>" + (desc ? "<small>" + esc(desc) + "</small>" : "") + "</div>" + sw(key, PRIV[key]) + "</div>";
+    return '<div class="pv-row" data-row="' + key + '">' + icon(bg, ic) + '<div class="pv-tx"><b>' + esc(title) + "</b>" + (desc ? "<small>" + esc(desc) + "</small>" : "") + "</div>" + sw(key, PRIV[key], title) + "</div>";
   }
   function navRow(go, ic, bg, title, val) {
-    return '<div class="pv-row" data-go="' + go + '">' + icon(bg, ic) + '<div class="pv-tx"><b>' + esc(title) + '</b></div><span class="pv-val" data-val="' + go + '">' + esc(val || "") + '</span><span class="pv-chev">‹</span></div>';
+    return '<div class="pv-row" data-go="' + go + '" role="button" tabindex="0">' + icon(bg, ic) + '<div class="pv-tx"><b>' + esc(title) + '</b></div><span class="pv-val" data-val="' + go + '">' + esc(val || "") + '</span><span class="pv-chev">‹</span></div>';
   }
   function header(title, back, extra) {
     return '<div class="pv-hd">' + (back ? '<button type="button" class="pv-ib" data-back aria-label="بازگشت">›</button>' : "") + "<h2>" + esc(title) + "</h2>" + (extra || "") +
@@ -281,10 +289,10 @@ window.CHATROOM = {
         swRow("searchable", "🔎", "#8a5bc9", "پیدا شدن در جستجو", "دیگران با جستجوی نام یا نام‌کاربری پیدایت کنند") + "</div>";
     },
     messages: function () {
-      function r(v, t, d) { return '<div class="pv-row' + (PRIV.dm_from === v ? " sel" : "") + '" data-dm="' + v + '"><div class="pv-tx"><b>' + t + "</b><small>" + d + '</small></div><span class="pv-rd"></span></div>'; }
-      return header("پیام‌های خصوصی", true) + '<p class="pv-note">انتخاب کن چه کسانی می‌توانند برای اولین بار به تو پیام خصوصی بدهند. گفتگوهایی که قبلاً شروع شده‌اند ادامه پیدا می‌کنند.</p><div class="pv-grp">' +
+      function r(v, t, d) { return '<div class="pv-row' + (PRIV.dm_from === v ? " sel" : "") + '" data-dm="' + v + '" role="radio" aria-checked="' + (PRIV.dm_from === v) + '" tabindex="0"><div class="pv-tx"><b>' + t + "</b><small>" + d + '</small></div><span class="pv-rd"></span></div>'; }
+      return header("پیام‌های خصوصی", true) + '<p class="pv-note">انتخاب کن چه کسانی می‌توانند برای اولین بار به تو پیام خصوصی بدهند. گفتگوهایی که قبلاً شروع شده‌اند ادامه پیدا می‌کنند.</p><div class="pv-grp" role="radiogroup" aria-label="چه کسی می‌تواند پیام بدهد">' +
         r("everyone", "همه", "هر کاربری می‌تواند پیام بدهد") +
-        r("contacts", "فقط مخاطبین", "فقط کسانی که در مخاطبین توان") +
+        r("contacts", "فقط مخاطبین", "فقط کسانی که در مخاطبین تو هستند") +
         r("nobody", "هیچ‌کس", "کسی نمی‌تواند گفتگوی جدید شروع کند") + "</div>";
     }
   };
@@ -302,8 +310,7 @@ window.CHATROOM = {
     return el;
   }
   function show(name, dir) {
-    var next = render(name), prev = $(".pv-pg:last-of-type", view);
-    prev = view.querySelector(".pv-pg:not(.leaving)");
+    var next = render(name), prev = view.querySelector(".pv-pg:not(.leaving)");
     if (!prev) { view.appendChild(next); bind(next, name); return; }
     navBusy = true; prev.classList.add("leaving");
     next.classList.add(dir > 0 ? "in-f" : "in-b"); view.appendChild(next); bind(next, name);
@@ -392,6 +399,19 @@ window.CHATROOM = {
   }
 
   /* ---------- global delegated events ---------- */
+  function onKey(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      var el = e.target.closest && e.target.closest("[data-go],[data-dm]");
+      if (el && el === e.target) { e.preventDefault(); el.click(); }
+    }
+    if (e.key === "Tab") {                       // keep focus inside the dialog
+      var f = [].filter.call(root.querySelectorAll('button,input:not([disabled]),[tabindex="0"],a[href]'), function (x) { return x.offsetParent !== null; });
+      if (!f.length) { e.preventDefault(); return; }
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === $("#pv-card"))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
   function onClick(e) {
     var t = e.target;
     if (t === root || t.closest("[data-close]")) { if (t === root || t.closest("[data-close]")) return close(); }
@@ -406,12 +426,12 @@ window.CHATROOM = {
   function setDm(rowEl) {
     var v = rowEl.dataset.dm; if (v === PRIV.dm_from || saving.dm_from) return;
     var old = PRIV.dm_from; saving.dm_from = 1;
-    rowEl.parentNode.querySelectorAll(".pv-row").forEach(function (r) { r.classList.toggle("sel", r === rowEl); });
+    rowEl.parentNode.querySelectorAll(".pv-row").forEach(function (r) { r.classList.toggle("sel", r === rowEl); r.setAttribute("aria-checked", r === rowEl); });
     PRIV.dm_from = v;
-    api("/api/privacy", "POST", {dm_from: v}).then(function (j) { PRIV = j.privacy; toast("ذخیره شد ✓"); })
+    api("/api/privacy", "POST", {dm_from: v}).then(function (j) { PRIV = j.privacy || PRIV; toast("ذخیره شد ✓"); })
       .catch(function (err) {
         PRIV.dm_from = old; toast(err.message || "ذخیره نشد", true);
-        rowEl.parentNode.querySelectorAll(".pv-row").forEach(function (r) { r.classList.toggle("sel", r.dataset.dm === old); });
+        rowEl.parentNode.querySelectorAll(".pv-row").forEach(function (r) { r.classList.toggle("sel", r.dataset.dm === old); r.setAttribute("aria-checked", r.dataset.dm === old); });
       }).then(function () { saving.dm_from = 0; });
   }
 
@@ -435,15 +455,16 @@ window.CHATROOM = {
     css();
     if (root) root.remove();
     root = document.createElement("div"); root.id = "pv-ov"; root.hidden = true; root.dir = "rtl";
-    root.innerHTML = '<section id="pv-card" role="dialog" aria-modal="true" aria-label="حریم خصوصی"><div id="pv-view"></div><div id="pv-toast" role="status"></div></section>';
+    root.innerHTML = '<section id="pv-card" role="dialog" aria-modal="true" aria-label="حریم خصوصی" tabindex="-1"><div id="pv-view"></div><div id="pv-toast" role="status"></div></section>';
     document.body.appendChild(root); view = $("#pv-view", root);
-    root.addEventListener("click", onClick); root.addEventListener("change", onChange);
+    root.addEventListener("click", onClick); root.addEventListener("change", onChange); root.addEventListener("keydown", onKey);
   }
   function open() {
     if (!root || !document.body.contains(root)) build();
     view.innerHTML = '<div class="pv-pg"><div class="pv-hd"><h2>حریم خصوصی</h2></div><div class="pv-sk"></div><div class="pv-sk"></div><div class="pv-sk"></div></div>';
-    stack = ["main"]; navBusy = false;
+    stack = ["main"]; navBusy = false; lastFocus = document.activeElement;
     root.hidden = false; void root.offsetWidth; root.classList.add("on"); document.documentElement.style.overflow = "hidden";
+    try { $("#pv-card").focus({preventScroll: true}); } catch (e) {}
     api("/api/privacy").then(function (j) {
       PRIV = j.privacy || {}; COUNTS = j.counts || COUNTS; syncProfileForm();
       view.innerHTML = ""; view.appendChild(render("main"));
@@ -452,6 +473,8 @@ window.CHATROOM = {
   function close() {
     if (!root) return; root.classList.remove("on"); document.documentElement.style.overflow = "";
     setTimeout(function () { if (!root.classList.contains("on")) root.hidden = true; }, 330);
+    if (lastFocus && lastFocus.focus && document.body.contains(lastFocus)) { try { lastFocus.focus({preventScroll: true}); } catch (e) {} }
+    lastFocus = null;
   }
   window.openPrivacy = open;
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && root && !root.hidden) (stack.length > 1 ? back : close)(); });
@@ -459,6 +482,7 @@ window.CHATROOM = {
   /* take over the "حریم خصوصی" row of the settings list */
   document.addEventListener("click", function (e) {
     if (root && root.contains(e.target)) return;
+    if (e.target.closest && e.target.closest("input,textarea,select,#messages,.composer")) return;
     var el = e.target;
     for (var i = 0; el && el !== document.body && i < 7; i++, el = el.parentElement) {
       var t = (el.textContent || "").replace(/\s+/g, " ").trim();
@@ -476,6 +500,7 @@ window.CHATROOM = {
       var u = (document.getElementById("view-user-id").textContent || "").replace(/^@/, "").trim(); if (!u) return;
       api("/api/blocked").then(function (j) {
         var was = (j.users || []).some(function (x) { return x.username === u; });
+        if (!was && !confirm("@" + u + " مسدود شود؟ دیگر نمی‌تواند به تو پیام بدهد.")) return;
         return api("/api/block", "POST", {username: u, block: !was}).then(function () { alert(was ? "از حالت مسدود درآمد." : "کاربر مسدود شد."); });
       }).catch(function (e) { alert(e.message || "انجام نشد"); });
     });
