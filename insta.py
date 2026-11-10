@@ -170,42 +170,117 @@ def register(g):
     def insta_page():
         username = session.get("insta_username")
         if not username:
-            return render_template("insta-auth.html")
+            return redirect("/auth/insta")
         users = insta_users()
         if username not in users:
             session.pop("insta_username", None)
-            return render_template("insta-auth.html")
+            return redirect("/auth/insta")
         return render_template("insta.html", current_user=users[username])
+
+    # ------------------------------------------------------------------ sign-up / sign-in (every bad value is checked with an `if`)
+    USERNAME_RE = re.compile(r"[a-z0-9_.]{3,30}")
+    parse_contact = g["parse_contact"]
+    dummy_hash = g.get("_DUMMY_HASH")
+
+    def text_field(d, key, maxlen):
+        """Return the stripped text of d[key]. Raises TypeError for lists/dicts/bools, ValueError when too long."""
+        v = d.get(key)
+        if v is None:
+            return ""
+        if isinstance(v, bool) or not isinstance(v, (str, int)):
+            raise TypeError(key)
+        v = str(v).strip()
+        if len(v) > maxlen:
+            raise ValueError(key)
+        return v
+
+    def client_key():
+        return request.remote_addr or "?"
 
     @app.route("/api/insta/auth/register", methods=["POST"])
     def insta_register_account():
-        d = request.get_json(silent=True) or {}
-        username = re.sub(r"[^a-zA-Z0-9_.]", "", str(d.get("username", "")).strip().lower())[:30]
-        password = str(d.get("password", ""))
-        phone = str(d.get("phone", "")).strip() or None
-        email = str(d.get("email", "")).strip().lower() or None
-        display = str(d.get("display_name", "")).strip()[:60] or username
-        if len(username) < 3 or len(password) < 8:
-            return err("نام کاربری باید حداقل ۳ حرف و رمز عبور حداقل ۸ کاراکتر باشد.")
-        if not phone and not email:
+        d = request.get_json(silent=True)
+        if not isinstance(d, dict):
+            return err("درخواست نامعتبر است.")
+        try:
+            username = text_field(d, "username", 30).lower().lstrip("@")
+            display = text_field(d, "display_name", 60)
+            contact = text_field(d, "contact", 120) or text_field(d, "email", 120) or text_field(d, "phone", 40)
+            password = d.get("password", "")
+        except TypeError:
+            return err("مقدار یکی از فیلدها معتبر نیست.")
+        except ValueError as e:
+            return err("یکی از فیلدها بیش از حد طولانی است (%s)." % e)
+        if not isinstance(password, str):
+            return err("رمز عبور معتبر نیست.")
+        if not username:
+            return err("نام کاربری را وارد کن.")
+        if not USERNAME_RE.fullmatch(username):
+            return err("نام کاربری باید ۳ تا ۳۰ حرف انگلیسی، عدد، _ یا نقطه باشد.")
+        if username.startswith(".") or username.endswith(".") or ".." in username:
+            return err("نام کاربری نباید با نقطه شروع یا تمام شود و دو نقطه پشت سر هم نداشته باشد.")
+        if not contact:
             return err("شماره تلفن یا ایمیل را وارد کن.")
+        email, phone, contact_err = parse_contact(contact)
+        if contact_err:
+            return err(contact_err)
+        if len(password) < 8:
+            return err("رمز عبور باید حداقل ۸ کاراکتر باشد.")
+        if len(password) > 128:
+            return err("رمز عبور نباید بیشتر از ۱۲۸ کاراکتر باشد.")
+        if password.lower() == username:
+            return err("رمز عبور نباید با نام کاربری یکی باشد.")
+        display = re.sub(r"[\x00-\x1f\x7f]", "", display).strip() or username
+        if not rate_ok("insta-reg:" + client_key(), 10, 600):
+            return err("تعداد درخواست‌ها زیاد است؛ چند دقیقه بعد دوباره تلاش کن.", 429)
+        if q("SELECT 1 FROM insta_accounts WHERE lower(username)=?", (username,), one=True):
+            return err("این نام کاربری قبلاً گرفته شده است.", 409)
+        if email and q("SELECT 1 FROM insta_accounts WHERE lower(email)=?", (email,), one=True):
+            return err("با این ایمیل قبلاً حساب اینستا ساخته شده است.", 409)
+        if phone and q("SELECT 1 FROM insta_accounts WHERE phone=?", (phone,), one=True):
+            return err("با این شماره قبلاً حساب اینستا ساخته شده است.", 409)
         try:
             q("INSERT INTO insta_accounts(username,password_hash,phone,email,display_name,created_at) VALUES(?,?,?,?,?,?)",
-              (username, generate_password_hash(password), phone, email, display, time.time()), commit=True)
+              (username, generate_password_hash(password), phone or None, email or None, display, time.time()), commit=True)
         except Exception:
             return err("این نام کاربری، شماره یا ایمیل قبلاً ثبت شده است.", 409)
-        session["insta_username"] = username
-        return jsonify(ok=True, username=username)
+        # No auto-login: the sign-up page wipes itself and shows the login form.
+        return jsonify(ok=True, registered=True, message="حساب اینستا ساخته شد. حالا وارد شو.")
 
     @app.route("/api/insta/auth/login", methods=["POST"])
     def insta_login_account():
-        d = request.get_json(silent=True) or {}
-        key = str(d.get("login", "")).strip().lower()
-        row = q("SELECT username,password_hash FROM insta_accounts WHERE lower(username)=? OR lower(email)=? OR phone=?", (key,key,key), one=True)
-        if not row or not check_password_hash(row["password_hash"], str(d.get("password", ""))):
+        d = request.get_json(silent=True)
+        if not isinstance(d, dict):
+            return err("درخواست نامعتبر است.")
+        try:
+            key = text_field(d, "login", 120).lower().lstrip("@")
+        except TypeError:
+            return err("نام کاربری یا ایمیل معتبر نیست.")
+        except ValueError:
+            return err("نام کاربری یا ایمیل خیلی طولانی است.")
+        password = d.get("password", "")
+        if not isinstance(password, str):
+            return err("رمز عبور معتبر نیست.")
+        if not key:
+            return err("نام کاربری، ایمیل یا شماره را وارد کن.")
+        if not password:
+            return err("رمز عبور را وارد کن.")
+        if len(password) > 128:
+            return err("اطلاعات ورود صحیح نیست.", 401)
+        if not rate_ok("insta-login-ip:" + client_key(), 60, 600) or not rate_ok("insta-login:" + client_key() + ":" + key, 8, 600):
+            return err("تعداد تلاش‌ها زیاد بود؛ چند دقیقه بعد دوباره امتحان کن.", 429)
+        em, ph, _ = parse_contact(key)              # a typed phone/email may be written differently than stored
+        row = q("SELECT username,password_hash FROM insta_accounts WHERE lower(username)=? OR lower(email)=? OR phone IN (?,?)",
+                (key, em or key, key, ph or key), one=True)
+        if not row:
+            if dummy_hash:
+                check_password_hash(dummy_hash, password)       # same time whether or not the account exists
+            return err("اطلاعات ورود صحیح نیست.", 401)
+        if not check_password_hash(row["password_hash"], password):
             return err("اطلاعات ورود صحیح نیست.", 401)
         session["insta_username"] = row["username"]
-        return jsonify(ok=True, username=row["username"])
+        session.permanent = True
+        return jsonify(ok=True, username=row["username"], redirect="/insta")
 
     @app.route("/api/insta/auth/logout", methods=["POST"])
     def insta_logout_account():
