@@ -69,3 +69,12 @@ body.lp::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
   90%{opacity:.7}
   100%{transform:translate3d(calc(var(--s) * -.5),-118dvh,0) scale(1.1);opacity:0}}
 @media(prefers-reduced-motion:reduce){body.lp::before{animation:none}.lp-bg i{animation:none;opacity:.35;bottom:auto;top:calc((var(--x) * 0.9))}}
+
+/* Only the two icons: bigger, centred, nothing else on the page */
+.lp-wrap{justify-content:center}
+.lp-doors{align-items:center;justify-items:center;gap:clamp(18px,5vh,48px)}
+.lp-stage .s3d{--size:clamp(150px,40vw,260px)}
+.lp-door{padding:14px;border-radius:36px}
+.lp-door::before{inset:0}
+@media(min-width:720px){.lp-doors{gap:72px}.lp-stage .s3d{--size:clamp(200px,24vw,280px)}}
+@media (max-height:640px) and (max-width:719px){.lp-stage .s3d{--size:120px}}
