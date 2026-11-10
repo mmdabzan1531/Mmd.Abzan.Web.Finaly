@@ -5,7 +5,7 @@ html,body{margin:0;min-height:100%}
 body.lp{min-height:100dvh;background:var(--bg);color:var(--ink);
   font-family:"Vazirmatn","IRANSansX","IRANSans","Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.6;
   -webkit-tap-highlight-color:transparent;overflow-x:hidden}
-.lp-wrap{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:clamp(8px,3vh,28px);
+.lp-wrap{position:relative;z-index:1;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:clamp(8px,3vh,28px);
   padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom));max-width:980px;margin:0 auto}
 .lp-head{text-align:center}
 .lp-head h1{margin:0 0 6px;font-size:clamp(1.55rem,5.4vw,2.5rem);font-weight:800;line-height:1.3}
@@ -48,3 +48,24 @@ body.lp{min-height:100dvh;background:var(--bg);color:var(--ink);
 @media(prefers-reduced-motion:reduce){
   .lp-floor{animation:none}.lp-door,.lp-go{transition:none}
   .lp-door.is-chosen .s3d-float{animation:none}}
+
+/* Animated background: the colour theme drifts (violet -> teal -> pink) and glass bubbles float up */
+body.lp::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(125deg,#0f0d1c 0%,#1b1445 22%,#0b2c46 45%,#0f0d1c 58%,#3a1038 80%,#0f0d1c 100%);
+  background-size:320% 320%;animation:lp-theme 28s ease-in-out infinite}
+@keyframes lp-theme{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.lp-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.lp-bg i{--c1:var(--chat);--c2:var(--chat2);position:absolute;left:var(--x);bottom:calc(var(--s) * -1.5);width:var(--s);height:var(--s);border-radius:50%;
+  background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.55),rgba(255,255,255,.06) 34%,transparent 36%),
+    radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--c1) 38%,transparent),color-mix(in srgb,var(--c2) 10%,transparent) 70%);
+  box-shadow:inset 0 0 calc(var(--s) * .22) color-mix(in srgb,var(--c1) 55%,transparent),0 0 calc(var(--s) * .5) color-mix(in srgb,var(--c1) 22%,transparent);
+  opacity:0;animation:lp-rise var(--d) linear var(--w) infinite}
+.lp-bg i[style*="--k:1"]{--c1:var(--insta);--c2:var(--insta2)}
+.lp-bg i[style*="--k:2"]{--c1:#8f3dff;--c2:#c9a4ff}
+@keyframes lp-rise{
+  0%{transform:translate3d(0,0,0) scale(.7);opacity:0}
+  10%{opacity:.85}
+  50%{transform:translate3d(calc(var(--s) * .6),-58dvh,0) scale(1)}
+  90%{opacity:.7}
+  100%{transform:translate3d(calc(var(--s) * -.5),-118dvh,0) scale(1.1);opacity:0}}
+@media(prefers-reduced-motion:reduce){body.lp::before{animation:none}.lp-bg i{animation:none;opacity:.35;bottom:auto;top:calc((var(--x) * 0.9))}}
