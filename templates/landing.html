@@ -3,28 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f0d1c">
-<title>ورود | چت‌روم و اینستا</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='solid3d.css') }}?v={{ ASSET_V }}">
+<meta name="theme-color" content="#050505">
+<title>Chat Room | Instagram</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}?v={{ ASSET_V }}">
-<noscript><style>.s3d{display:none}</style></noscript>
 </head>
 <body class="lp">
-<div class="lp-bg" aria-hidden="true">
-  {% for i in range(18) %}<i style="--x:{{ (i * 37 + 8) % 96 }}%;--s:{{ 22 + (i * 23) % 74 }}px;--d:{{ 15 + (i * 5) % 13 }}s;--w:{{ -((i * 7) % 22) }}s;--k:{{ i % 3 }}"></i>{% endfor %}
-</div>
-<main class="lp-wrap" id="main">
+<svg class="lp-wave lp-wave-a" viewBox="0 0 400 400" aria-hidden="true"><defs><linearGradient id="wa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b2b2b"/><stop offset="1" stop-color="#070707"/></linearGradient></defs><path d="M0 0H330C300 80 230 110 150 150C80 185 40 260 0 380Z" fill="url(#wa)" stroke="rgba(255,255,255,.1)"/><path d="M0 0H250C220 70 160 90 100 130C50 165 20 220 0 290Z" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.08)"/></svg>
+<svg class="lp-wave lp-wave-b" viewBox="0 0 400 400" aria-hidden="true"><defs><linearGradient id="wb" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#2b2b2b"/><stop offset="1" stop-color="#070707"/></linearGradient></defs><path d="M400 400H70C100 320 170 290 250 250C320 215 360 140 400 20Z" fill="url(#wb)" stroke="rgba(255,255,255,.1)"/><path d="M400 400H150C180 330 240 310 300 270C350 235 380 180 400 110Z" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.08)"/></svg>
 
-  <nav class="lp-doors" id="doors" aria-label="انتخاب بخش">
-    <a class="lp-door" data-section="chat" aria-label="چت‌روم" href="{{ url_for('chat') if chat_in else url_for('auth_page', section='chat') }}">
-      <span class="lp-stage"><span class="s3d" data-shape="chat" aria-hidden="true"></span><span class="lp-floor" aria-hidden="true"></span></span>
+<main class="lp-wrap" id="main">
+  <nav class="lp-doors" id="doors" aria-label="Chat Room or Instagram">
+    <a class="lp-tile" data-section="chat" aria-label="Chat Room" href="{{ url_for('chat') if chat_in else url_for('auth_page', section='chat') }}">
+      <span class="lp-glass">
+        <svg class="lp-ico" viewBox="0 0 120 100" aria-hidden="true">
+          <defs><linearGradient id="ig1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f4f4"/><stop offset="1" stop-color="#a9a9a9"/></linearGradient></defs>
+          <path d="M80 34a26 22 0 0 1 26 22c0 8-4 14-10 19l8 14-18-6a30 24 0 0 1-8 1c-12 0-22-6-26-14 22-1 38-14 28-36z" fill="#8d8d8d"/>
+          <path d="M36 6h30a28 23 0 0 1 28 23 28 23 0 0 1-28 23H48L24 62l4-14C14 43 8 36 8 29A28 23 0 0 1 36 6z" fill="url(#ig1)"/>
+          <circle cx="38" cy="29" r="4.6" fill="#1b1b1b"/><circle cx="51" cy="29" r="4.6" fill="#1b1b1b"/><circle cx="64" cy="29" r="4.6" fill="#1b1b1b"/>
+        </svg>
+        <span class="lp-label">Chat Room</span>
+      </span>
     </a>
-    <a class="lp-door" data-section="insta" aria-label="اینستا" href="{{ '/insta' if insta_in else url_for('auth_page', section='insta') }}">
-      <span class="lp-stage"><span class="s3d" data-shape="insta" aria-hidden="true"></span><span class="lp-floor" aria-hidden="true"></span></span>
+    <a class="lp-tile" data-section="insta" aria-label="Instagram" href="{{ '/insta' if insta_in else url_for('auth_page', section='insta') }}">
+      <span class="lp-glass">
+        <svg class="lp-ico" viewBox="0 0 100 100" aria-hidden="true">
+          <defs><linearGradient id="ig2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f4f4"/><stop offset="1" stop-color="#a9a9a9"/></linearGradient></defs>
+          <rect x="10" y="10" width="80" height="80" rx="24" fill="none" stroke="url(#ig2)" stroke-width="9"/>
+          <circle cx="50" cy="50" r="19" fill="none" stroke="url(#ig2)" stroke-width="9"/>
+          <circle cx="72" cy="28" r="5.5" fill="url(#ig2)"/>
+        </svg>
+        <span class="lp-label">Instagram</span>
+      </span>
     </a>
   </nav>
 </main>
-<script src="{{ url_for('static', filename='solid3d.js') }}?v={{ ASSET_V }}"></script>
 <script src="{{ url_for('static', filename='landing.js') }}?v={{ ASSET_V }}"></script>
 </body>
 </html>
