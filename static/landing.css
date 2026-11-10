@@ -1,80 +1,47 @@
-/* Landing: two doors, two solid objects */
-:root{--bg:#0f0d1c;--ink:#f3f0ff;--muted:#a9a4c6;--insta:#ff3d7f;--insta2:#ff9a3c;--chat:#2aa8ff;--chat2:#3df2d0}
+/* Landing: two black glass tiles on a dark, slowly moving background */
+:root{--bg:#050505;--ink:#f1f1f1}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
-body.lp{min-height:100dvh;background:var(--bg);color:var(--ink);
-  font-family:"Vazirmatn","IRANSansX","IRANSans","Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.6;
-  -webkit-tap-highlight-color:transparent;overflow-x:hidden}
-.lp-wrap{position:relative;z-index:1;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:clamp(8px,3vh,28px);
-  padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom));max-width:980px;margin:0 auto}
-.lp-head{text-align:center}
-.lp-head h1{margin:0 0 6px;font-size:clamp(1.55rem,5.4vw,2.5rem);font-weight:800;line-height:1.3}
-.lp-head p{margin:0;text-wrap:balance;color:var(--muted);font-size:clamp(.92rem,2.6vw,1.05rem)}
+body.lp{min-height:100dvh;background:radial-gradient(120% 80% at 50% 40%,#101010,var(--bg) 70%);color:var(--ink);overflow-x:hidden;
+  font-family:"Inter","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
 
-.lp-doors{display:grid;grid-template-columns:1fr;gap:clamp(4px,2vh,24px)}
-@media(min-width:720px){.lp-doors{grid-template-columns:1fr 1fr;gap:32px}}
+/* moving waves */
+.lp-wave{position:fixed;z-index:0;width:min(88vw,620px);height:auto;pointer-events:none}
+.lp-wave-a{top:0;left:0;animation:lp-drift-a 22s ease-in-out infinite}
+.lp-wave-b{bottom:0;right:0;animation:lp-drift-b 26s ease-in-out infinite}
+@keyframes lp-drift-a{0%,100%{transform:translate(-4%,-3%) rotate(0deg) scale(1)}50%{transform:translate(4%,3%) rotate(2.5deg) scale(1.06)}}
+@keyframes lp-drift-b{0%,100%{transform:translate(4%,3%) rotate(0deg) scale(1)}50%{transform:translate(-4%,-3%) rotate(-2.5deg) scale(1.06)}}
 
-.lp-door{--a1:var(--chat);--a2:var(--chat2);position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;
-  padding:10px 12px 14px;color:inherit;text-decoration:none;border-radius:28px;outline:none;isolation:isolate;
-  transition:opacity .4s ease,translate .45s cubic-bezier(.23,1,.32,1)}
-.lp-door[data-section=insta]{--a1:var(--insta);--a2:var(--insta2)}
-.lp-door::before{content:"";position:absolute;z-index:-1;inset:6% 8% 30%;border-radius:50%;
-  background:radial-gradient(closest-side,var(--a1),transparent);opacity:.22;filter:blur(30px);transition:opacity .4s ease}
-.lp-door:hover::before,.lp-door:focus-visible::before{opacity:.42}
-.lp-door:focus-visible{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--a2)}
+.lp-wrap{position:relative;z-index:1;min-height:100dvh;display:flex;align-items:center;justify-content:center;
+  padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom))}
+.lp-doors{display:flex;flex-direction:column;align-items:center;gap:clamp(40px,9vh,76px)}
+@media(min-width:760px){.lp-doors{flex-direction:row;gap:72px}}
 
-.lp-stage{position:relative;display:block;width:100%;padding:6px 0 18px}
-.lp-stage .s3d{--size:clamp(132px,34vw,230px)}
-.lp-floor{position:absolute;left:50%;bottom:4px;width:clamp(100px,26vw,170px);height:18px;translate:-50% 0;border-radius:50%;
-  background:radial-gradient(closest-side,rgba(0,0,0,.55),transparent);filter:blur(3px);animation:lp-floor 9s ease-in-out infinite}
-.lp-door[data-section=chat] .lp-floor{animation-delay:-4.5s}
-@keyframes lp-floor{0%,100%{scale:1;opacity:.9}50%{scale:.84;opacity:.6}}
+.lp-tile{--rx:0deg;--ry:0deg;position:relative;display:block;width:min(60vw,290px);aspect-ratio:1.1/1;color:inherit;text-decoration:none;outline:none;
+  perspective:900px;transition:opacity .35s ease,translate .4s cubic-bezier(.23,1,.32,1)}
+/* light spots on the floor under the tile */
+.lp-tile::after{content:"";position:absolute;left:8%;right:8%;bottom:-22px;height:26px;pointer-events:none;
+  background:radial-gradient(closest-side at 22% 50%,rgba(255,255,255,.5),transparent),radial-gradient(closest-side at 78% 50%,rgba(255,255,255,.5),transparent);
+  filter:blur(5px);opacity:.7;animation:lp-pulse 6s ease-in-out infinite}
+.lp-tile[data-section=insta]::after{animation-delay:-3s}
+@keyframes lp-pulse{0%,100%{opacity:.45}50%{opacity:.85}}
 
-.lp-door:hover .s3d-tilt,.lp-door:focus-visible .s3d-tilt{scale:1.09}
-.lp-name{font-size:clamp(1.4rem,4.4vw,1.9rem);font-weight:800;line-height:1.3}
-.lp-desc{margin-top:2px;color:var(--muted);font-size:clamp(.88rem,2.5vw,.98rem);max-width:30ch}
-.lp-go{margin-top:10px;padding:9px 22px;border-radius:999px;font-weight:700;font-size:.92rem;color:#120f24;
-  background:linear-gradient(100deg,var(--a1),var(--a2));transition:scale .2s ease}
-.lp-door:active .lp-go{scale:.96}
+.lp-glass{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(6px,2vw,12px);
+  border-radius:24%/26%;background:linear-gradient(160deg,#1d1d1d 0%,#050505 55%,#000 100%);
+  border:1.5px solid rgba(255,255,255,.42);
+  box-shadow:inset 0 3px 2px rgba(255,255,255,.35),inset 0 -2px 6px rgba(255,255,255,.08),0 0 0 7px rgba(255,255,255,.045),0 18px 40px rgba(0,0,0,.7);
+  transform:rotateX(var(--rx)) rotateY(var(--ry));transform-style:preserve-3d;transition:transform .25s ease-out,scale .3s cubic-bezier(.23,1,.32,1)}
+.lp-glass::before{content:"";position:absolute;inset:3% 4% 52%;border-radius:22% 22% 50% 50%/40% 40% 70% 70%;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0))}
+.lp-ico{width:46%;height:auto;filter:drop-shadow(0 3px 2px rgba(0,0,0,.8)) drop-shadow(0 -1px 0 rgba(255,255,255,.5));transform:translateZ(24px)}
+.lp-label{font-weight:700;font-size:clamp(1rem,4.6vw,1.35rem);letter-spacing:.2px;direction:ltr;color:#e9e9e9;text-shadow:0 2px 2px #000,0 -1px 0 rgba(255,255,255,.35);transform:translateZ(14px)}
 
-/* choosing a door: its object spins toward you, the other fades */
-.lp-doors.has-choice .lp-door:not(.is-chosen){opacity:0;translate:0 12px;pointer-events:none}
-.lp-door.is-chosen .s3d-float{animation:lp-spin .55s cubic-bezier(.55,0,.8,.4) forwards}
-.lp-door.is-chosen .s3d-tilt{scale:1.25}
-@keyframes lp-spin{to{transform:rotateY(360deg) rotateX(0deg) translateZ(calc(var(--u) * 40))}}
+.lp-tile:hover .lp-glass,.lp-tile:focus-visible .lp-glass{scale:1.05}
+.lp-tile:focus-visible .lp-glass{border-color:#fff}
+.lp-tile:active .lp-glass{scale:.97}
 
-@media (max-height:640px) and (max-width:719px){
-  .lp-stage .s3d{--size:110px}.lp-desc{display:none}}
-@media(prefers-reduced-motion:reduce){
-  .lp-floor{animation:none}.lp-door,.lp-go{transition:none}
-  .lp-door.is-chosen .s3d-float{animation:none}}
+/* choosing a tile: the other one fades */
+.lp-doors.has-choice .lp-tile:not(.is-chosen){opacity:0;translate:0 12px;pointer-events:none}
+.lp-tile.is-chosen .lp-glass{scale:1.12}
 
-/* Animated background: the colour theme drifts (violet -> teal -> pink) and glass bubbles float up */
-body.lp::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(125deg,#0f0d1c 0%,#1b1445 22%,#0b2c46 45%,#0f0d1c 58%,#3a1038 80%,#0f0d1c 100%);
-  background-size:320% 320%;animation:lp-theme 28s ease-in-out infinite}
-@keyframes lp-theme{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-.lp-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
-.lp-bg i{--c1:var(--chat);--c2:var(--chat2);position:absolute;left:var(--x);bottom:calc(var(--s) * -1.5);width:var(--s);height:var(--s);border-radius:50%;
-  background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.55),rgba(255,255,255,.06) 34%,transparent 36%),
-    radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--c1) 38%,transparent),color-mix(in srgb,var(--c2) 10%,transparent) 70%);
-  box-shadow:inset 0 0 calc(var(--s) * .22) color-mix(in srgb,var(--c1) 55%,transparent),0 0 calc(var(--s) * .5) color-mix(in srgb,var(--c1) 22%,transparent);
-  opacity:0;animation:lp-rise var(--d) linear var(--w) infinite}
-.lp-bg i[style*="--k:1"]{--c1:var(--insta);--c2:var(--insta2)}
-.lp-bg i[style*="--k:2"]{--c1:#8f3dff;--c2:#c9a4ff}
-@keyframes lp-rise{
-  0%{transform:translate3d(0,0,0) scale(.7);opacity:0}
-  10%{opacity:.85}
-  50%{transform:translate3d(calc(var(--s) * .6),-58dvh,0) scale(1)}
-  90%{opacity:.7}
-  100%{transform:translate3d(calc(var(--s) * -.5),-118dvh,0) scale(1.1);opacity:0}}
-@media(prefers-reduced-motion:reduce){body.lp::before{animation:none}.lp-bg i{animation:none;opacity:.35;bottom:auto;top:calc((var(--x) * 0.9))}}
-
-/* Only the two icons: bigger, centred, nothing else on the page */
-.lp-wrap{justify-content:center}
-.lp-doors{align-items:center;justify-items:center;gap:clamp(18px,5vh,48px)}
-.lp-stage .s3d{--size:clamp(150px,40vw,260px)}
-.lp-door{padding:14px;border-radius:36px}
-.lp-door::before{inset:0}
-@media(min-width:720px){.lp-doors{gap:72px}.lp-stage .s3d{--size:clamp(200px,24vw,280px)}}
-@media (max-height:640px) and (max-width:719px){.lp-stage .s3d{--size:120px}}
+@media(prefers-reduced-motion:reduce){.lp-wave,.lp-tile::after{animation:none}.lp-glass,.lp-tile{transition:none}}
