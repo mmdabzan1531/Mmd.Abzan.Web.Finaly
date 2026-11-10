@@ -14,23 +14,13 @@
   {% for i in range(18) %}<i style="--x:{{ (i * 37 + 8) % 96 }}%;--s:{{ 22 + (i * 23) % 74 }}px;--d:{{ 15 + (i * 5) % 13 }}s;--w:{{ -((i * 7) % 22) }}s;--k:{{ i % 3 }}"></i>{% endfor %}
 </div>
 <main class="lp-wrap" id="main">
-  <header class="lp-head">
-    <h1>از کدوم در وارد می‌شی؟</h1>
-    <p>هر بخش حساب جداگانه‌ی خودش را دارد. یکی را انتخاب کن.</p>
-  </header>
 
   <nav class="lp-doors" id="doors" aria-label="انتخاب بخش">
-    <a class="lp-door" data-section="chat" href="{{ url_for('chat') if chat_in else url_for('auth_page', section='chat') }}">
+    <a class="lp-door" data-section="chat" aria-label="چت‌روم" href="{{ url_for('chat') if chat_in else url_for('auth_page', section='chat') }}">
       <span class="lp-stage"><span class="s3d" data-shape="chat" aria-hidden="true"></span><span class="lp-floor" aria-hidden="true"></span></span>
-      <span class="lp-name">چت‌روم</span>
-      <span class="lp-desc">گفتگوی خصوصی و گروهی با دوستانت</span>
-      <span class="lp-go">{{ 'ادامه با حساب فعلی' if chat_in else 'ورود یا ساخت حساب' }}</span>
     </a>
-    <a class="lp-door" data-section="insta" href="{{ '/insta' if insta_in else url_for('auth_page', section='insta') }}">
+    <a class="lp-door" data-section="insta" aria-label="اینستا" href="{{ '/insta' if insta_in else url_for('auth_page', section='insta') }}">
       <span class="lp-stage"><span class="s3d" data-shape="insta" aria-hidden="true"></span><span class="lp-floor" aria-hidden="true"></span></span>
-      <span class="lp-name">اینستا</span>
-      <span class="lp-desc">پست، ریلز و استوری، همراه با پیام مستقیم</span>
-      <span class="lp-go">{{ 'ادامه با حساب فعلی' if insta_in else 'ورود یا ساخت حساب' }}</span>
     </a>
   </nav>
 </main>
