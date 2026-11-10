@@ -589,7 +589,7 @@ def logged_in(fn):
     @wraps(fn)
     def wrap(*a, **kw):
         if "username" not in session:
-            return redirect(url_for("index"))
+            return redirect(url_for("auth_page", section="chat"))
         return fn(*a, **kw)
     return wrap
 
@@ -688,7 +688,10 @@ def broadcast_presence():
 
 def login_user(username):
     pending_inv = session.get("pending_invite")
+    insta_user = session.get("insta_username")          # Insta has its own account: never log it out
     session.clear()
+    if insta_user:
+        session["insta_username"] = insta_user
     session["username"] = username
     session.permanent = True
     return pending_inv
@@ -1550,32 +1553,71 @@ def set_lang(code):
     return resp
 
 
-@app.route("/", methods=["GET", "POST"])
+# ---------- landing: choose Chatroom or Insta ----------
+@app.route("/", methods=["GET"])
 def index():
-    if "username" in session:
+    pick = need_lang_choice()                      # first visit: ask for the language
+    if pick:
+        return pick
+    return render_template("landing.html", chat_in="username" in session, insta_in="insta_username" in session)
+
+
+# ---------- one sign-in / sign-up gate per section ----------
+GATE_SECTIONS = ("chat", "insta")
+
+
+@app.route("/auth/<section>")
+def auth_page(section):
+    if section not in GATE_SECTIONS:                # unknown section -> back to the two doors
+        return redirect(url_for("index"))
+    if section == "chat" and "username" in session:
         return redirect(url_for("chat"))
-    need = session.get("login_fails", 0) >= 3          # captcha only after repeated failures (like big sites)
-    if request.method == "GET":
-        pick = need_lang_choice()                      # first visit: ask for the language
-        if pick:
-            return pick
-        return render_template("index.html", need_captcha=need, captcha_question=new_captcha() if need else "")
-    ident = request.form.get("identifier", "").strip()[:120]
-    password = request.form.get("password", "")
+    if section == "insta" and "insta_username" in session:
+        return redirect("/insta")
+    need = section == "chat" and session.get("login_fails", 0) >= 3
+    question = new_captcha() if section == "chat" else ""     # chat sign-up always needs the sum
+    return render_template("gate.html", section=section, need_captcha=need, captcha_question=question,
+                           dev_codes=DEV_CODES)
+
+
+@app.route("/login")
+def login_alias():                                   # old links keep working
+    return redirect(url_for("auth_page", section="chat"))
+
+
+@app.route("/api/chat/login", methods=["POST"])
+def chat_login_api():
+    p = request.get_json(silent=True)
+    if not isinstance(p, dict):
+        return jsonify(error="درخواست نامعتبر است."), 400
+    ident, password = p.get("identifier"), p.get("password")
+    if not isinstance(ident, str) or not isinstance(password, str):
+        return jsonify(error="نام کاربری و رمز عبور را درست وارد کن."), 400
+    ident = ident.strip()[:120]
+    if not ident:
+        return jsonify(error="نام کاربری، ایمیل یا شماره را وارد کن."), 400
+    if not password:
+        return jsonify(error="رمز عبور را وارد کن."), 400
+    if len(password) > 256:
+        return jsonify(error="رمز عبور خیلی طولانی است."), 400
     if not rate_ok("login-ip:" + client_ip(), 120, 600) or not rate_ok("login:" + client_ip() + ":" + ident.lower(), 8, 600):
-        flash("تعداد تلاش‌ها زیاد بود؛ چند دقیقه بعد دوباره امتحان کن.", "error")
-        return redirect(url_for("index"))
-    if need and not captcha_ok(request.form.get("captcha")):
-        flash("تأیید ربات ناموفق بود؛ حاصل جمع را درست وارد کن.", "error")
-        return redirect(url_for("index"))
+        return jsonify(error="تعداد تلاش‌ها زیاد بود؛ چند دقیقه بعد دوباره امتحان کن."), 429
+    need = session.get("login_fails", 0) >= 3        # captcha only after repeated failures
+    if need and not captcha_ok(p.get("captcha")):
+        return jsonify(error="تأیید ربات ناموفق بود؛ حاصل جمع را درست وارد کن.", captcha_required=True,
+                       captcha=new_captcha()), 400
     users = read_json(USERS_FILE, {})
     name = find_user(ident, users)
     good = check_password_hash(users[name].get("password_hash", ""), password) if name else (check_password_hash(_DUMMY_HASH, password) and False)
     if not name or not good:
         session["login_fails"] = session.get("login_fails", 0) + 1
-        flash("نام کاربری یا رمز عبور درست نیست. دوباره تلاش کن یا رمز را بازیابی کن.", "error")
-        return redirect(url_for("index"))
-    return start_session(name)
+        out = {"error": "نام کاربری یا رمز عبور درست نیست."}
+        if session["login_fails"] >= 3:
+            out.update(captcha_required=True, captcha=new_captcha())
+        return jsonify(out), 401
+    inv = login_user(name)
+    resp = jsonify(ok=True, redirect=url_for("join_invite", invite_code=inv) if inv else url_for("chat"))
+    return sync_user_lang(resp, name)
 
 
 @app.route("/signup")
@@ -1600,8 +1642,13 @@ def forgot_page():
 
 @app.route("/api/signup/start", methods=["POST"])
 def signup_start():
-    p = request.get_json(silent=True) or {}
+    p = request.get_json(silent=True)
     fail = lambda m, c=400: (jsonify(error=m, captcha=new_captcha()), c)
+    if not isinstance(p, dict):
+        return fail("درخواست نامعتبر است.")
+    for key in ("username", "password", "contact", "display_name", "captcha"):    # TypeError guard: only text/numbers
+        if p.get(key) is not None and (isinstance(p[key], bool) or not isinstance(p[key], (str, int))):
+            return fail("مقدار یکی از فیلدها معتبر نیست.")
     if not captcha_ok(p.get("captcha")):
         return fail("تأیید ربات ناموفق بود؛ حاصل جمع را درست وارد کن.")
     username, password = str(p.get("username", "")).strip(), str(p.get("password", ""))
@@ -1613,6 +1660,8 @@ def signup_start():
         return fail("نام کاربری باید ۳ تا ۲۰ حرف انگلیسی، عدد یا زیرخط (_) باشد.")
     if len(password) < 8:
         return fail("رمز عبور باید حداقل ۸ کاراکتر باشد.")
+    if len(password) > 128:
+        return fail("رمز عبور نباید بیشتر از ۱۲۸ کاراکتر باشد.")
     users = read_json(USERS_FILE, {})
     if any(n.lower() == username.lower() for n in users):
         return fail("این نام کاربری قبلاً گرفته شده است.")
@@ -1668,9 +1717,15 @@ def signup_resend():
 def signup_verify():
     token = session.get("signup_token")
     rec = pending.get(token)
-    code = str((request.get_json(silent=True) or {}).get("code", "")).translate(DIGITS).strip()
+    body = request.get_json(silent=True)
+    raw_code = body.get("code", "") if isinstance(body, dict) else ""
+    if isinstance(raw_code, bool) or not isinstance(raw_code, (str, int)):
+        return jsonify(error="کد را درست وارد کن."), 400
+    code = str(raw_code).translate(DIGITS).strip()
     if not rec or rec["exp"] < time.time():
         return jsonify(error="کد منقضی شده؛ از اول ثبت‌نام کن."), 400
+    if not re.fullmatch(r"\d{6}", code):
+        return jsonify(error="کد باید ۶ رقم باشد."), 400
     rec["tries"] += 1
     if rec["tries"] > 5:
         pending.pop(token, None)
@@ -1688,9 +1743,10 @@ def signup_verify():
                                   "created_at": datetime.now(timezone.utc).isoformat()}
         write_json(USERS_FILE, users)
     pending.pop(token, None)
+    session.pop("signup_token", None)
     onboard_bot_chat(rec["username"])
-    inv = login_user(rec["username"])
-    resp = jsonify(ok=True, redirect=url_for("join_invite", invite_code=inv) if inv else url_for("chat"))
+    # no auto-login: the person signs in on purpose (a pending invite link stays in the session)
+    resp = jsonify(ok=True, registered=True, message="حساب ساخته شد. حالا وارد شو.")
     return set_lang_cookie(resp, lang)
 
 
@@ -1796,7 +1852,10 @@ def chat():
 
 @app.route("/logout")
 def logout():
+    insta_user = session.get("insta_username")      # chat logout must not end the separate Insta session
     session.clear()
+    if insta_user:
+        session["insta_username"] = insta_user
     return redirect(url_for("index"))
 
 
@@ -1804,7 +1863,7 @@ def logout():
 def join_invite(invite_code):
     if "username" not in session:
         session["pending_invite"] = invite_code
-        return redirect(url_for("index", mode="login"))
+        return redirect(url_for("auth_page", section="chat"))
     session.pop("pending_invite", None)
     username = session["username"]
     with data_lock:
@@ -1918,1322 +1977,4 @@ def update_group(group_id):
         if g.get("type") == "dm":
             return jsonify(error="گفتگوی خصوصی تنظیمات ندارد."), 400
         if not is_admin(g, username):
-            return jsonify(error="فقط مالک یا ادمین گروه می‌تواند تنظیمات را تغییر دهد."), 403
-        name = str(p.get("name", "")).strip()[:40]
-        desc = str(p.get("description", "")).strip()[:180]
-        if not name:
-            return jsonify(error="نام گروه نمی‌تواند خالی باشد."), 400
-        g.update(name=name, description=desc)
-        write_json(GROUPS_FILE, groups)
-    socketio.emit("group_updated", {"id": group_id, "group": public_group(g)}, to=group_id)
-    return jsonify(ok=True, group=public_group(g))
-
-
-@app.route("/api/group/<group_id>/invite", methods=["POST"])
-@logged_in
-def invite_link(group_id):
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or not is_member(g, session["username"]):
-            return jsonify(error="به این گروه دسترسی نداری."), 403
-        if g.get("type") == "dm":
-            return jsonify(error="برای گفتگوی خصوصی لینک دعوت وجود ندارد."), 400
-        if not g.get("members_can_invite", True) and not is_admin(g, session["username"]):
-            return jsonify(error="فقط مالک یا ادمین می‌تواند لینک دعوت بگیرد."), 403
-        if not g.get("invite_code"):
-            g["invite_code"] = secrets.token_urlsafe(12)
-            write_json(GROUPS_FILE, groups)
-    return jsonify(ok=True, invite_url=request.url_root.rstrip("/") + "/join/" + g["invite_code"])
-
-
-@app.route("/api/user/<username>")
-@logged_in
-def public_profile(username):
-    u = read_json(USERS_FILE, {}).get(username)
-    if not u:
-        return jsonify(error="کاربر پیدا نشد."), 404
-    return jsonify(ok=True, user=safe_user_public(u))
-
-
-@app.route("/api/dm", methods=["POST"])
-@logged_in
-def open_dm():
-    me = session["username"]
-    other = str((request.get_json(silent=True) or {}).get("username", "")).strip()
-    users = read_json(USERS_FILE, {})
-    if other not in users or other == me:
-        return jsonify(error="کاربر پیدا نشد."), 404
-    gid = dm_id(me, other)
-    if other != BOT_USER:
-        if is_blocked(users, me, other):
-            return jsonify(error="این کاربر را مسدود کرده‌ای؛ اول از حالت مسدود درش بیاور."), 403
-        if is_blocked(users, other, me):
-            return jsonify(error="امکان ارسال پیام به این کاربر وجود ندارد."), 403
-        _mode = _dm_mode(users[other])
-        if _mode != "everyone" and gid not in read_json(GROUPS_FILE, {}) and \
-                (_mode == "nobody" or me not in (users[other].get("contacts") or {})):
-            return jsonify(error="این کاربر پیام خصوصی نمی‌پذیرد." if _mode == "nobody"
-                           else "این کاربر فقط از مخاطبینش پیام می‌پذیرد."), 403
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        if gid not in groups:
-            groups[gid] = {"name": "", "description": "", "members": [me, other], "owner": "", "type": "dm",
-                           "created_by": me, "invite_code": secrets.token_urlsafe(12)}
-            write_json(GROUPS_FILE, groups)
-        d = public_group(groups[gid]); d["last"] = last_msg(gid)
-    join_sids(me, gid); join_sids(other, gid)
-    return jsonify(ok=True, id=gid, group=d, user=safe_user_public(users[other]))
-
-
-# ---------- my full profile + contacts (Telegram-style bottom bar) ----------
-@app.route("/api/me/profile")
-@api_login
-def my_full_profile():
-    u = read_json(USERS_FILE, {}).get(session["username"])
-    if not u:
-        return jsonify(error="کاربر پیدا نشد."), 404
-    return jsonify(ok=True, user=safe_user_public(u, True))
-
-
-def _find_user_by_ident(users, ident):
-    """username (with/without @) or phone number -> username or None."""
-    ident = str(ident or "").strip()
-    if not ident:
-        return None
-    low = ident.lstrip("@").lower()
-    for n in users:
-        if n.lower() == low:
-            return n
-    ph = norm_phone(ident)
-    if ph:
-        for n, u in users.items():
-            if u.get("phone") and u.get("phone") == ph:
-                return n
-    return None
-
-
-def _contacts_payload(users, me):
-    saved = users.get(me, {}).get("contacts") or {}
-    out = []
-    for name, custom in saved.items():
-        if name in users and name != me:
-            out.append({"username": name, "name": str(custom or "")[:60], "user": safe_user_public(users[name])})
-    out.sort(key=lambda c: (c["name"] or c["user"]["display_name"] or c["username"]).lower())
-    return out
-
-
-PRIVACY_KEYS = ("show_online", "show_phone", "show_email", "show_bio", "show_birthday",
-                "show_avatar", "searchable", "private_account")
-PRIVACY_DEFAULTS = {"show_online": True, "show_phone": False, "show_email": False, "show_bio": True,
-                    "show_birthday": False, "show_avatar": True, "searchable": True, "private_account": False}
-PRIVACY_LISTS = ("close_friends", "hide_story")
-
-
-def _privacy_of(u):
-    p = {k: (bool(u.get(k)) if PRIVACY_DEFAULTS[k] is False else u.get(k, True) is not False) for k in PRIVACY_KEYS}
-    p["dm_from"] = _dm_mode(u)
-    return p
-
-
-def _counts_of(u):
-    return {"blocked": len(u.get("blocked") or []), "close_friends": len(u.get("close_friends") or []),
-            "hide_story": len(u.get("hide_story") or [])}
-
-
-@app.route("/api/privacy", methods=["GET", "POST"])
-@api_login
-def api_privacy():
-    me = session["username"]
-    if request.method == "GET":
-        u = read_json(USERS_FILE, {}).get(me)
-        if not u:
-            return jsonify(error="کاربر پیدا نشد."), 404
-        return jsonify(ok=True, privacy=_privacy_of(u), counts=_counts_of(u))
-    d = request.get_json(silent=True) or {}
-    if not isinstance(d, dict):
-        return jsonify(error="درخواست نامعتبر است."), 400
-    with data_lock:
-        users = read_json(USERS_FILE, {})
-        if me not in users:
-            return jsonify(error="کاربر پیدا نشد."), 404
-        for k in PRIVACY_KEYS:
-            if k in d:
-                v = d[k]
-                users[me][k] = (v.strip().lower() in ("1", "true", "on")) if isinstance(v, str) else bool(v)
-        if "dm_from" in d:
-            if d["dm_from"] not in ("everyone", "contacts", "nobody"):
-                return jsonify(error="مقدار نامعتبر است."), 400
-            users[me]["dm_from"] = d["dm_from"]
-            users[me]["allow_dm"] = d["dm_from"] == "everyone"
-        write_json(USERS_FILE, users)
-        u = users[me]
-        pub, full = safe_user_public(u), safe_user_public(u, True)
-        priv, counts = _privacy_of(u), _counts_of(u)
-    socketio.emit("profile_updated", pub)
-    broadcast_presence()
-    return jsonify(ok=True, user=full, privacy=priv, counts=counts)
-
-
-@app.route("/api/privacy/list/<name>", methods=["GET", "POST"])
-@api_login
-def api_privacy_list(name):
-    """close_friends / hide_story: GET -> members, POST {username, add} -> add/remove one."""
-    if name not in PRIVACY_LISTS:
-        return jsonify(error="لیست نامعتبر است."), 404
-    me = session["username"]
-    with data_lock:
-        users = read_json(USERS_FILE, {})
-        if me not in users:
-            return jsonify(error="کاربر پیدا نشد."), 404
-        lst = [n for n in (users[me].get(name) or []) if n in users]
-        if request.method == "POST":
-            d = request.get_json(silent=True) or {}
-            other, add = str(d.get("username", "")).strip().lstrip("@"), bool(d.get("add", True))
-            other = next((n for n in users if n.lower() == other.lower()), None) if other else None
-            if not other or other == me or other == BOT_USER:
-                return jsonify(error="کاربر پیدا نشد."), 404
-            lst = [n for n in lst if n != other]
-            if add:
-                lst.append(other)
-            users[me][name] = lst[:1000]
-            write_json(USERS_FILE, users)
-        out = [{"username": n, "display_name": users[n].get("display_name", n), "avatar": users[n].get("avatar", "🙂"),
-                "avatar_url": users[n].get("avatar_url", "") if users[n].get("show_avatar", True) is not False else ""} for n in lst]
-    if request.method == "POST":
-        socketio.emit("stories_changed", {"user": me})
-    return jsonify(ok=True, users=out, count=len(out))
-
-
-@app.route("/api/block", methods=["POST"])
-@api_login
-def api_block():
-    me = session["username"]
-    d = request.get_json(silent=True) or {}
-    other, block = str(d.get("username", "")).strip(), bool(d.get("block", True))
-    with data_lock:
-        users = read_json(USERS_FILE, {})
-        if other not in users or other == me or other == BOT_USER:
-            return jsonify(error="کاربر پیدا نشد."), 404
-        lst = [n for n in (users[me].get("blocked") or []) if n != other]
-        if block:
-            lst.append(other)
-        users[me]["blocked"] = lst[:500]
-        write_json(USERS_FILE, users)
-    socketio.emit("stories_changed", {"user": me})
-    return jsonify(ok=True, blocked=lst, count=len(lst))
-
-
-@app.route("/api/blocked")
-@api_login
-def api_blocked():
-    users = read_json(USERS_FILE, {})
-    lst = list((users.get(session["username"]) or {}).get("blocked") or [])
-    return jsonify(ok=True, users=[{"username": n, "display_name": users[n].get("display_name", n),
-                                    "avatar": users[n].get("avatar", "🙂"),
-                                    "avatar_url": users[n].get("avatar_url", "") if users[n].get("show_avatar", True) is not False else ""}
-                                   for n in lst if n in users])
-
-
-# ---------- premium purchase (Zarinpal) ----------
-# Set these environment variables on the server (Render -> Environment):
-#   ZARINPAL_MERCHANT_ID   your 36-character merchant id   (required, otherwise buying is disabled)
-#   PREMIUM_PRICE_TOMAN    price in Toman           (default 50000)
-#   PREMIUM_DAYS           length of one purchase    (default 30)
-#   ZARINPAL_SANDBOX=1     use the test gateway while trying it out
-PAYMENTS_FILE = os.path.join(DATA_DIR, "payments.json")
-
-
-def premium_plan():
-    def _int(name, default):
-        try:
-            return max(1, int(env(name, str(default)) or default))
-        except (TypeError, ValueError):
-            return default
-    return {"price": _int("PREMIUM_PRICE_TOMAN", 50000), "days": _int("PREMIUM_DAYS", 30),
-            "merchant": env("ZARINPAL_MERCHANT_ID").strip(),
-            "sandbox": env("ZARINPAL_SANDBOX").strip().lower() in ("1", "true", "yes")}
-
-
-def _zp_call(plan, path, payload):
-    base = "https://sandbox.zarinpal.com" if plan["sandbox"] else "https://payment.zarinpal.com"
-    req = urllib.request.Request(base + path, data=json.dumps(payload).encode("utf-8"),
-                                 headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "ChatRoom"})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            body = r.read().decode("utf-8") or "{}"
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace") or "{}"
-    return json.loads(body)
-
-
-@app.route("/api/premium")
-@logged_in
-def premium_info():
-    users = read_json(USERS_FILE, {})
-    u = users.get(session["username"]) or {}
-    plan = premium_plan()
-    until = 0
-    try:
-        until = float(u.get("premium_until") or 0)
-    except (TypeError, ValueError):
-        pass
-    return jsonify(ok=True, price=plan["price"], days=plan["days"], configured=bool(plan["merchant"]),
-                   premium=is_premium(u), until=until)
-
-
-@app.route("/api/premium/buy", methods=["POST"])
-@logged_in
-def premium_buy():
-    plan = premium_plan(); me = session["username"]
-    if not plan["merchant"]:
-        return jsonify(error="درگاه پرداخت هنوز فعال نشده است. با پشتیبانی در ارتباط باش.", code="not_configured"), 503
-    users = read_json(USERS_FILE, {})
-    u = users.get(me) or {}
-    meta = {}
-    if re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", str(u.get("email") or "")):
-        meta["email"] = u["email"]
-    payload = {"merchant_id": plan["merchant"], "amount": plan["price"] * 10,       # the gateway counts in Rial
-               "callback_url": url_for("premium_callback", _external=True),
-               "description": f"خرید اشتراک پریمیوم ChatRoom ({plan['days']} روزه) - {me}", "metadata": meta}
-    try:
-        res = _zp_call(plan, "/pg/v4/payment/request.json", payload)
-    except Exception:
-        return jsonify(error="اتصال به درگاه پرداخت برقرار نشد. کمی بعد دوباره تلاش کن."), 502
-    data = res.get("data") if isinstance(res.get("data"), dict) else {}
-    authority = data.get("authority")
-    if data.get("code") != 100 or not authority:
-        return jsonify(error="درگاه پرداخت درخواست را نپذیرفت. لطفاً بعداً تلاش کن."), 502
-    with data_lock:
-        pay = read_json(PAYMENTS_FILE, {})
-        pay[authority] = {"user": me, "amount": plan["price"], "days": plan["days"], "status": "pending", "created_at": time.time()}
-        write_json(PAYMENTS_FILE, pay)
-    base = "https://sandbox.zarinpal.com" if plan["sandbox"] else "https://payment.zarinpal.com"
-    return jsonify(ok=True, url=f"{base}/pg/StartPay/{authority}")
-
-
-@app.route("/premium/callback")
-def premium_callback():
-    authority = request.args.get("Authority", "")
-    ok_status = request.args.get("Status", "") == "OK"
-    plan = premium_plan()
-    with data_lock:
-        pay = read_json(PAYMENTS_FILE, {})
-        rec = pay.get(authority)
-        if not rec:
-            return redirect("/chat?premium=unknown")
-        if rec.get("status") == "paid":
-            return redirect("/chat?premium=ok")
-        if not ok_status:
-            rec["status"] = "canceled"; write_json(PAYMENTS_FILE, pay)
-            return redirect("/chat?premium=cancel")
-        try:
-            res = _zp_call(plan, "/pg/v4/payment/verify.json", {"merchant_id": plan["merchant"], "amount": rec["amount"] * 10, "authority": authority})
-        except Exception:
-            return redirect("/chat?premium=error")        # nothing is granted; the user can retry / contact support
-        data = res.get("data") if isinstance(res.get("data"), dict) else {}
-        if data.get("code") not in (100, 101):
-            rec["status"] = "failed"; write_json(PAYMENTS_FILE, pay)
-            return redirect("/chat?premium=failed")
-        users = read_json(USERS_FILE, {})
-        u = users.get(rec["user"])
-        if u is not None:
-            try:
-                start = max(time.time(), float(u.get("premium_until") or 0))
-            except (TypeError, ValueError):
-                start = time.time()
-            u["premium_until"] = start + int(rec.get("days") or plan["days"]) * 86400
-            write_json(USERS_FILE, users)
-        rec.update(status="paid", ref_id=data.get("ref_id"), paid_at=time.time())
-        write_json(PAYMENTS_FILE, pay)
-    return redirect("/chat?premium=ok")
-
-
-# ---------- stories (24 h free; 48 h / 72 h need premium) ----------
-STORIES_FILE = os.path.join(DATA_DIR, "stories.json")
-STORY_BGS = {f"g{i}" for i in range(1, 13)}
-STORY_HOURS_FREE = (6, 12, 24)
-STORY_HOURS_PREMIUM = (48, 72)
-MAX_ACTIVE_STORIES = 30
-
-
-def is_premium(u):
-    """Premium = users.json has \"premium\": true (or \"premium_until\": <unix time>), or the name is in CHATROOM_PREMIUM_USERS=a,b,c."""
-    if not u:
-        return False
-    if u.get("premium") is True:
-        return True
-    try:
-        if u.get("premium_until") and float(u["premium_until"]) > time.time():
-            return True
-    except (TypeError, ValueError):
-        pass
-    names = {x.strip().lower() for x in env("CHATROOM_PREMIUM_USERS").split(",") if x.strip()}
-    return str(u.get("username", "")).lower() in names
-
-
-def _story_out(s, me):
-    out = {k: s.get(k) for k in ("id", "user", "kind", "media_url", "text", "caption", "bg", "created_at", "expires_at", "duration_h", "audience")}
-    out["viewed"] = me in (s.get("views") or {})
-    if s["user"] == me:
-        out.update(views_count=len(s.get("views") or {}), in_profile=bool(s.get("in_profile", True)),
-                   archived=bool(s.get("archived")), active=s["expires_at"] > time.time())
-    return out
-
-
-def _stories_cleanup(items):
-    """Expired stories that were not saved to the profile are removed (with their photo)."""
-    now = time.time()
-    dead = [i for i, st in items.items() if st["expires_at"] <= now and not st.get("in_profile", True)]
-    for i in dead:
-        remove_media_url(items.pop(i).get("media_url"))
-    return bool(dead)
-
-
-def _story_circle(me, users):
-    """Usernames whose stories I may see: people I share a chat with + my contacts + people who saved me."""
-    names = set()
-    for g in read_json(GROUPS_FILE, {}).values():
-        if me in g.get("members", []):
-            names.update(g.get("members", []))
-    names.update((users.get(me, {}).get("contacts") or {}).keys())
-    names.update(n for n, u in users.items() if isinstance(u.get("contacts"), dict) and me in u["contacts"])
-    names.discard(me)
-    return names
-
-
-def _can_see_story(st, me, users, circle):
-    if st["user"] == me:
-        return True
-    if st["user"] not in users:
-        return False
-    owner = users[st["user"]]
-    if me in (owner.get("blocked") or []) or st["user"] in (users.get(me, {}).get("blocked") or []):
-        return False                          # blocked either way: no stories
-    if me in (owner.get("hide_story") or []):
-        return False                          # "hide story from": explicit hide list
-    if st.get("audience") == "close":         # close friends only
-        return me in (owner.get("close_friends") or [])
-    if owner.get("private_account") and me not in (owner.get("contacts") or {}):
-        return False                          # private account: contacts only
-    if st.get("audience") == "contacts":      # "contacts only": people in my circle who are in my contacts
-        return st["user"] in circle and me in (users[st["user"]].get("contacts") or {})
-    return True                               # "everyone": every signed-in user sees it
-
-
-@app.route("/api/stories", methods=["GET", "POST"])
-@api_login
-def api_stories():
-    me = session["username"]
-    if request.method == "GET":
-        with data_lock:
-            items = read_json(STORIES_FILE, {})
-            if _stories_cleanup(items):
-                write_json(STORIES_FILE, items)
-        users, now = read_json(USERS_FILE, {}), time.time()
-        circle = _story_circle(me, users)
-        by_user = {}
-        for st in items.values():
-            if st["expires_at"] > now and _can_see_story(st, me, users, circle):
-                by_user.setdefault(st["user"], []).append(st)
-        res = []
-        for n, lst in by_user.items():
-            lst.sort(key=lambda x: x["created_at"])
-            res.append({"user": safe_user_public(users[n]), "stories": [_story_out(x, me) for x in lst],
-                        "unseen": any(me not in (x.get("views") or {}) for x in lst) and n != me, "latest": lst[-1]["created_at"]})
-        res.sort(key=lambda g: (g["user"]["username"] != me, not g["unseen"], -g["latest"]))
-        return jsonify(ok=True, groups=res)
-
-    # ---- create ----
-    f = request.form
-    kind = f.get("kind", "image")
-    if kind not in ("image", "text", "video"):
-        return jsonify(error="نوع استوری نامعتبر است."), 400
-    try:
-        hours = int(f.get("duration", "24"))
-    except ValueError:
-        hours = 24
-    if hours not in STORY_HOURS_FREE + STORY_HOURS_PREMIUM:
-        return jsonify(error="مدت نمایش نامعتبر است."), 400
-    audience = f.get("audience") if f.get("audience") in ("contacts", "close") else "everyone"
-    text = str(f.get("text", "")).strip()[:300]
-    caption = str(f.get("caption", "")).strip()[:200]
-    bg = f.get("bg", "g1") if f.get("bg", "g1") in STORY_BGS else "g1"
-    media_url, data, ext = "", None, ""
-    if kind == "text":
-        if not text:
-            return jsonify(error="متن استوری را بنویس."), 400
-        caption = ""
-    elif kind == "video":
-        clip = request.files.get("image") or request.files.get("video")
-        if not clip or not clip.filename:
-            return jsonify(error="یک ویدیو انتخاب کن."), 400
-        ext = os.path.splitext(secure_filename(clip.filename))[1].lower()
-        if ext not in VIDEO_MIME:
-            return jsonify(error="فرمت ویدیو پشتیبانی نمی‌شود (mp4 / webm / mov)."), 400
-        data = clip.read(MAX_FILE_SIZE + 1)
-        if len(data) > MAX_FILE_SIZE:
-            return jsonify(error=f"حجم ویدیو باید کمتر از {MAX_FILE_MB} مگابایت باشد."), 400
-        if not data:
-            return jsonify(error="فایل خالی است."), 400
-        text = ""
-    else:
-        photo = request.files.get("image")
-        if not photo or not photo.filename:
-            return jsonify(error="یک عکس انتخاب کن."), 400
-        ext = os.path.splitext(secure_filename(photo.filename))[1].lower()
-        if ext not in ALLOWED_IMAGE_EXTENSIONS:
-            return jsonify(error="فرمت عکس پشتیبانی نمی‌شود."), 400
-        data = photo.read(MAX_IMAGE_SIZE + 1)
-        if len(data) > MAX_IMAGE_SIZE:
-            return jsonify(error="حجم عکس باید کمتر از ۴ مگابایت باشد."), 400
-        if not looks_like_image(data[:16]):
-            return jsonify(error="فایل تصویر معتبر نیست."), 400
-        text = ""
-    with data_lock:
-        users = read_json(USERS_FILE, {})
-        if me not in users:
-            return jsonify(error="کاربر پیدا نشد."), 404
-        if hours in STORY_HOURS_PREMIUM and not is_premium(users[me]):
-            return jsonify(error="نمایش ۴۸ و ۷۲ ساعته فقط برای کاربران پریمیوم است.", code="premium_required"), 403
-        items = read_json(STORIES_FILE, {})
-        _stories_cleanup(items)
-        now = time.time()
-        if sum(1 for x in items.values() if x["user"] == me and x["expires_at"] > now) >= MAX_ACTIVE_STORIES:
-            return jsonify(error="تعداد استوری‌های فعالت به سقف رسیده است."), 400
-        if data is not None:
-            filename = f"{uuid.uuid4().hex}{ext}"
-            store_media(filename, (VIDEO_MIME if kind == "video" else IMAGE_MIME)[ext], data)
-            media_url = "/media/" + filename
-        sid = uuid.uuid4().hex[:16]
-        items[sid] = {"id": sid, "user": me, "kind": kind, "media_url": media_url, "text": text, "caption": caption, "bg": bg,
-                      "created_at": now, "expires_at": now + hours * 3600, "duration_h": hours, "audience": audience,
-                      "in_profile": f.get("save_profile", "1") == "1", "archived": False, "views": {}}
-        write_json(STORIES_FILE, items)
-        out = _story_out(items[sid], me)
-    socketio.emit("stories_changed", {"user": me})     # everybody's story row refreshes right away
-    return jsonify(ok=True, story=out)
-
-
-@app.route("/api/stories/mine")
-@api_login
-def api_stories_mine():
-    me = session["username"]
-    with data_lock:
-        items = read_json(STORIES_FILE, {})
-        if _stories_cleanup(items):
-            write_json(STORIES_FILE, items)
-    mine = sorted((x for x in items.values() if x["user"] == me), key=lambda x: -x["created_at"])
-    return jsonify(ok=True, stories=[_story_out(x, me) for x in mine])
-
-
-@app.route("/api/stories/<sid>/view", methods=["POST"])
-@api_login
-def api_story_view(sid):
-    me = session["username"]
-    with data_lock:
-        items = read_json(STORIES_FILE, {})
-        st = items.get(sid)
-        users = read_json(USERS_FILE, {})
-        if not st or st["expires_at"] <= time.time() or not _can_see_story(st, me, users, _story_circle(me, users)):
-            return jsonify(error="استوری پیدا نشد."), 404
-        if st["user"] != me and me not in (st.get("views") or {}):
-            st.setdefault("views", {})[me] = time.time()
-            write_json(STORIES_FILE, items)
-    return jsonify(ok=True)
-
-
-@app.route("/api/stories/<sid>/views")
-@api_login
-def api_story_views(sid):
-    me = session["username"]
-    st = read_json(STORIES_FILE, {}).get(sid)
-    if not st or st["user"] != me:
-        return jsonify(error="استوری پیدا نشد."), 404
-    users = read_json(USERS_FILE, {})
-    rows = sorted(((n, ts) for n, ts in (st.get("views") or {}).items() if n in users), key=lambda r: -r[1])
-    return jsonify(ok=True, views=[{"user": safe_user_public(users[n]), "at": ts} for n, ts in rows])
-
-
-@app.route("/api/stories/<sid>/archive", methods=["POST"])
-@api_login
-def api_story_archive(sid):
-    me = session["username"]
-    flag = bool((request.get_json(silent=True) or {}).get("archived"))
-    with data_lock:
-        items = read_json(STORIES_FILE, {})
-        st = items.get(sid)
-        if not st or st["user"] != me:
-            return jsonify(error="استوری پیدا نشد."), 404
-        st["archived"] = flag
-        write_json(STORIES_FILE, items)
-    return jsonify(ok=True, archived=flag)
-
-
-@app.route("/api/stories/<sid>", methods=["DELETE"])
-@api_login
-def api_story_delete(sid):
-    me = session["username"]
-    with data_lock:
-        items = read_json(STORIES_FILE, {})
-        st = items.get(sid)
-        if not st or st["user"] != me:
-            return jsonify(error="استوری پیدا نشد."), 404
-        items.pop(sid)
-        write_json(STORIES_FILE, items)
-    remove_media_url(st.get("media_url"))
-    socketio.emit("stories_changed", {"user": me})
-    return jsonify(ok=True)
-
-
-@app.route("/api/contacts", methods=["GET", "POST"])
-@api_login
-def api_contacts():
-    me = session["username"]
-    if request.method == "GET":
-        return jsonify(ok=True, contacts=_contacts_payload(read_json(USERS_FILE, {}), me))
-    d = request.get_json(silent=True) or {}
-    custom = str(d.get("name", "")).strip()[:60]
-    with data_lock:
-        users = read_json(USERS_FILE, {})
-        if me not in users:
-            return jsonify(error="کاربر پیدا نشد."), 404
-        other = _find_user_by_ident(users, d.get("ident"))
-        if not other or other == me or other == BOT_USER:
-            return jsonify(error="کاربری با این نام کاربری یا شماره پیدا نشد."), 404
-        contacts = users[me].get("contacts")
-        if not isinstance(contacts, dict):
-            contacts = {}
-        if len(contacts) >= 2000 and other not in contacts:
-            return jsonify(error="سقف تعداد مخاطبین پر شده است."), 400
-        contacts[other] = custom
-        users[me]["contacts"] = contacts
-        write_json(USERS_FILE, users)
-        res = _contacts_payload(users, me)
-    return jsonify(ok=True, contacts=res, added=other)
-
-
-@app.route("/api/contacts/<username>", methods=["DELETE"])
-@api_login
-def api_contact_delete(username):
-    me = session["username"]
-    with data_lock:
-        users = read_json(USERS_FILE, {})
-        contacts = (users.get(me) or {}).get("contacts")
-        if isinstance(contacts, dict) and username in contacts:
-            del contacts[username]
-            users[me]["contacts"] = contacts
-            write_json(USERS_FILE, users)
-        res = _contacts_payload(users, me)
-    return jsonify(ok=True, contacts=res)
-
-
-@app.route("/api/contacts/match", methods=["POST"])
-@api_login
-def api_contacts_match():
-    """The phone's address book (picked by the user in the browser) -> which numbers are registered here.
-    Phone numbers are only compared, never stored. Matches are saved as contacts under the phone-book name."""
-    me = session["username"]
-    items = (request.get_json(silent=True) or {}).get("items")
-    if not isinstance(items, list):
-        return jsonify(error="درخواست نامعتبر است."), 400
-    wanted = {}
-    for it in items[:600]:
-        if not isinstance(it, dict):
-            continue
-        nm = str(it.get("name", "")).strip()[:60]
-        for p in (it.get("phones") or [])[:5]:
-            ph = norm_phone(p)
-            if ph and ph not in wanted:
-                wanted[ph] = nm
-    with data_lock:
-        users = read_json(USERS_FILE, {})
-        if me not in users:
-            return jsonify(error="کاربر پیدا نشد."), 404
-        by_phone = {u.get("phone"): n for n, u in users.items() if u.get("phone") and n not in (me, BOT_USER)}
-        contacts = users[me].get("contacts")
-        if not isinstance(contacts, dict):
-            contacts = {}
-        found = 0
-        for ph, nm in wanted.items():
-            n = by_phone.get(ph)
-            if n:
-                found += 1
-                if len(contacts) < 2000 or n in contacts:
-                    contacts[n] = nm or contacts.get(n, "")
-        users[me]["contacts"] = contacts
-        write_json(USERS_FILE, users)
-        res = _contacts_payload(users, me)
-    return jsonify(ok=True, contacts=res, found=found, total=len(wanted))
-
-
-@app.route("/api/users/search")
-@logged_in
-def search_users():
-    s = request.args.get("q", "").strip().lower().lstrip("@")
-    if len(s) < 2:
-        return jsonify(ok=True, users=[])
-    me = session["username"]
-    _all = read_json(USERS_FILE, {})
-    res = [safe_user_public(u) for n, u in _all.items()
-           if n != me and (s in n.lower() or s in u.get("display_name", "").lower())
-           and ((u.get("searchable", True) is not False and not u.get("private_account")) or n.lower() == s)
-           and not is_blocked(_all, n, me)]
-    return jsonify(ok=True, users=res[:15])
-
-
-@app.context_processor
-def inject_site():
-    n = datetime.now()
-    y = n.year - 621 if (n.month, n.day) >= (3, 21) else n.year - 622
-    return {"SITE": {"email": env("SUPPORT_EMAIL", "support@chatroom.example"), "phone": env("SUPPORT_PHONE", "۰۹۱۲۰۰۰۰۰۰۰"),
-                     "tel": env("SUPPORT_TEL", "۰۲۱-۹۱۰۰۰۰۰۰"), "address": env("SUPPORT_ADDRESS", "تهران، خیابان نمونه، پلاک ۱۰ (اطلاعات آزمایشی)"),
-                     "year": str(y).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))},
-            "LANG": current_lang(), "LANGS": LANGS}
-
-
-@app.route("/privacy")
-@app.route("/terms")
-def legal():
-    return render_template("legal.html", kind="privacy" if request.path == "/privacy" else "terms", logged="username" in session)
-
-
-@app.route("/contact")
-def contact():
-    return redirect("/about#contact")
-
-
-@app.route("/about")
-@app.route("/support")
-def about():
-    return render_template("about.html", logged="username" in session)
-
-
-@app.route("/api/support", methods=["POST"])
-def support_submit():
-    p = request.get_json(silent=True) or {}
-    dq, now = recent_sends["support:" + (request.remote_addr or "?")], time.time()
-    while dq and now - dq[0] > 600:
-        dq.popleft()
-    if len(dq) >= 3:
-        return jsonify(error="تعداد درخواست‌ها زیاد است؛ کمی بعد تلاش کن."), 429
-    msg = str(p.get("message", "")).strip()[:1500]
-    if len(msg) < 5:
-        return jsonify(error="پیامت را کامل‌تر بنویس."), 400
-    dq.append(now)
-    with data_lock:
-        items = read_json(SUPPORT_FILE, [])
-        ticket = f"CR-{len(items) + 1001}"
-        items.append({"ticket": ticket, "user": session.get("username", ""), "contact": str(p.get("contact", ""))[:120],
-                      "subject": str(p.get("subject", ""))[:80], "message": msg, "at": datetime.now(timezone.utc).isoformat()})
-        write_json(SUPPORT_FILE, items)
-    return jsonify(ok=True, ticket=ticket)
-
-
-# ---------- group roles: owner > admin > member ----------
-def role_of(g, username):
-    if g.get("type") == "dm":
-        return "member" if username in g.get("members", []) else None
-    if g.get("owner") == username:
-        return "owner"
-    if username in g.get("admins", []):
-        return "admin"
-    return "member" if username in g.get("members", []) else None
-
-
-def is_admin(g, username):
-    return g.get("type") != "dm" and role_of(g, username) in ("owner", "admin")
-
-
-def _err(msg, code=400):
-    return jsonify(error=msg), code
-
-
-def _kick_sids(username, gid):
-    for sid, u in list(online_sids.items()):
-        if u == username:
-            socketio.server.leave_room(sid, gid, namespace="/")
-
-
-def _refresh_user(username):
-    socketio.emit("groups_snapshot", {"groups": my_groups(username)}, to="user:" + username)
-
-
-def _group_updated(gid, g):
-    socketio.emit("group_updated", {"id": gid, "group": public_group(g)}, to=gid)
-
-
-@app.route("/api/group/<group_id>/members")
-@api_login
-def group_members(group_id):
-    me = session["username"]
-    g = valid_group(me, group_id)
-    if not g:
-        return _err("گروه پیدا نشد.", 404)
-    users = read_json(USERS_FILE, {})
-    out = []
-    for n in g["members"]:
-        if n in users:
-            d = safe_user_public(users[n])
-            d["role"] = role_of(g, n)
-            out.append(d)
-    order = {"owner": 0, "admin": 1, "member": 2}
-    out.sort(key=lambda d: order.get(d["role"], 3))
-    return jsonify(ok=True, members=out, my_role=role_of(g, me),
-                   banned=g.get("banned", []) if is_admin(g, me) else [])
-
-
-@app.route("/api/group/<group_id>/kick", methods=["POST"])
-@api_login
-def group_kick(group_id):
-    """مالک/ادمین: حذف عضو. ادمین فقط عضو عادی را می‌تواند حذف کند. body: {username, ban: true}"""
-    me = session["username"]
-    p = request.get_json(silent=True) or {}
-    target = str(p.get("username", ""))
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or not is_admin(g, me):
-            return _err("فقط مالک یا ادمین می‌تواند عضو حذف کند.", 403)
-        if target == me:
-            return _err("برای خروج از گروه از گزینه‌ی «ترک گروه» استفاده کن.")
-        if target not in g["members"]:
-            return _err("این کاربر عضو گروه نیست.", 404)
-        if target == g.get("owner"):
-            return _err("مالک گروه را نمی‌شود حذف کرد.", 403)
-        if target in g.get("admins", []) and role_of(g, me) != "owner":
-            return _err("فقط مالک می‌تواند ادمین را حذف کند.", 403)
-        g["members"].remove(target)
-        if target in g.get("admins", []):
-            g["admins"].remove(target)
-        if bool(p.get("ban", True)) and target not in g.setdefault("banned", []):
-            g["banned"].append(target)       # با لینک دعوت هم نمی‌تواند برگردد
-        write_json(GROUPS_FILE, groups)
-    _kick_sids(target, group_id)
-    socketio.emit("removed_from_group", {"id": group_id}, to="user:" + target)
-    _refresh_user(target)
-    _group_updated(group_id, g)
-    return jsonify(ok=True, group=public_group(g))
-
-
-@app.route("/api/group/<group_id>/unban", methods=["POST"])
-@api_login
-def group_unban(group_id):
-    me = session["username"]
-    target = str((request.get_json(silent=True) or {}).get("username", ""))
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or not is_admin(g, me):
-            return _err("اجازه نداری.", 403)
-        if target in g.get("banned", []):
-            g["banned"].remove(target)
-            write_json(GROUPS_FILE, groups)
-    return jsonify(ok=True)
-
-
-@app.route("/api/group/<group_id>/role", methods=["POST"])
-@api_login
-def group_role(group_id):
-    """فقط مالک: ارتقا به ادمین یا برگشت به عضو عادی. body: {username, role: 'admin'|'member'}"""
-    me = session["username"]
-    p = request.get_json(silent=True) or {}
-    target, role = str(p.get("username", "")), str(p.get("role", ""))
-    if role not in ("admin", "member"):
-        return _err("نقش نامعتبر است.")
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or role_of(g, me) != "owner":
-            return _err("فقط مالک گروه می‌تواند ادمین تعیین کند.", 403)
-        if target not in g["members"] or target == me:
-            return _err("کاربر معتبر نیست.", 404)
-        admins = g.setdefault("admins", [])
-        if role == "admin" and target not in admins:
-            admins.append(target)
-        elif role == "member" and target in admins:
-            admins.remove(target)
-        write_json(GROUPS_FILE, groups)
-    _group_updated(group_id, g)
-    _refresh_user(target)
-    return jsonify(ok=True, group=public_group(g))
-
-
-@app.route("/api/group/<group_id>/transfer", methods=["POST"])
-@api_login
-def group_transfer(group_id):
-    """فقط مالک: انتقال مالکیت. مالک قبلی ادمین می‌شود."""
-    me = session["username"]
-    target = str((request.get_json(silent=True) or {}).get("username", ""))
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or role_of(g, me) != "owner":
-            return _err("فقط مالک گروه می‌تواند مالکیت را منتقل کند.", 403)
-        if target not in g["members"] or target == me:
-            return _err("کاربر معتبر نیست.", 404)
-        g["owner"] = target
-        admins = g.setdefault("admins", [])
-        if target in admins:
-            admins.remove(target)
-        if me not in admins:
-            admins.append(me)
-        write_json(GROUPS_FILE, groups)
-    _group_updated(group_id, g)
-    _refresh_user(me)
-    _refresh_user(target)
-    return jsonify(ok=True, group=public_group(g))
-
-
-@app.route("/api/group/<group_id>/photo", methods=["POST"])
-@api_login
-def group_photo(group_id):
-    """مالک/ادمین: تغییر یا حذف عکس گروه. multipart form: photo (فایل) یا remove=1"""
-    me = session["username"]
-    photo = request.files.get("photo")
-    remove = request.form.get("remove") == "1"
-    old = ""
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or g.get("type") == "dm" or not is_admin(g, me):
-            return _err("فقط مالک یا ادمین می‌تواند عکس گروه را تغییر دهد.", 403)
-        old = g.get("avatar_url", "")
-        if remove:
-            g["avatar_url"] = ""
-        elif photo and photo.filename:
-            ext = os.path.splitext(secure_filename(photo.filename))[1].lower()
-            if ext not in ALLOWED_IMAGE_EXTENSIONS:
-                return _err("فرمت عکس پشتیبانی نمی‌شود.")
-            data = photo.read(MAX_IMAGE_SIZE + 1)
-            if len(data) > MAX_IMAGE_SIZE:
-                return _err("حجم عکس باید کمتر از ۴ مگابایت باشد.")
-            if not data or not looks_like_image(data[:16]):
-                return _err("فایل تصویر معتبر نیست.")
-            name = uuid.uuid4().hex + ext
-            store_media(name, IMAGE_MIME[ext], data)
-            g["avatar_url"] = "/media/" + name
-        else:
-            return _err("عکسی انتخاب نشده است.")
-        write_json(GROUPS_FILE, groups)
-    if old and old != g.get("avatar_url", ""):
-        remove_media_url(old)
-    _group_updated(group_id, g)
-    for n in list(g.get("members", [])):
-        _refresh_user(n)
-    return jsonify(ok=True, group=public_group(g))
-
-
-BG_PRESET_RE = re.compile(r"^[a-z0-9_-]{1,24}$")
-
-
-@app.route("/api/group/<group_id>/background", methods=["POST"])
-@api_login
-def group_background(group_id):
-    """مالک/ادمین: تغییر پس‌زمینه‌ی چت گروه برای همه‌ی اعضا.
-    multipart/form: photo (فایل) | preset=<id> | remove=1"""
-    me = session["username"]
-    photo = request.files.get("photo")
-    preset = str(request.form.get("preset", "")).strip().lower()
-    remove = request.form.get("remove") == "1"
-    old = ""
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or g.get("type") == "dm" or not is_admin(g, me):
-            return _err("فقط مالک یا ادمین می‌تواند پس‌زمینه‌ی گروه را تغییر دهد.", 403)
-        old = g.get("background", "")
-        if remove:
-            g["background"] = ""
-        elif preset:
-            if not BG_PRESET_RE.fullmatch(preset):
-                return _err("پس‌زمینه نامعتبر است.")
-            g["background"] = "p:" + preset
-        elif photo and photo.filename:
-            ext = os.path.splitext(secure_filename(photo.filename))[1].lower()
-            if ext not in ALLOWED_IMAGE_EXTENSIONS:
-                return _err("فرمت عکس پشتیبانی نمی‌شود.")
-            data = photo.read(MAX_IMAGE_SIZE + 1)
-            if len(data) > MAX_IMAGE_SIZE:
-                return _err("حجم عکس باید کمتر از ۴ مگابایت باشد.")
-            if not data or not looks_like_image(data[:16]):
-                return _err("فایل تصویر معتبر نیست.")
-            name = uuid.uuid4().hex + ext
-            store_media(name, IMAGE_MIME[ext], data)
-            g["background"] = "/media/" + name
-        else:
-            return _err("پس‌زمینه‌ای انتخاب نشده است.")
-        write_json(GROUPS_FILE, groups)
-    if old and old != g.get("background", ""):
-        remove_media_url(old)
-    _group_updated(group_id, g)
-    return jsonify(ok=True, group=public_group(g))
-
-
-def _delete_group_data(group_id, avatar_url="", background=""):
-    names = [a.get("file") for a in (_parse_attach(r["attach"]) for r in
-             q("SELECT attach FROM messages WHERE group_id=? AND attach<>''", (group_id,))) if a]
-    q("DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE group_id=?)", (group_id,), commit=True)
-    q("DELETE FROM poll_votes WHERE message_id IN (SELECT id FROM messages WHERE group_id=?)", (group_id,), commit=True)
-    q("DELETE FROM messages WHERE group_id=?", (group_id,), commit=True)
-    cleanup_media(names)
-    remove_media_url(avatar_url)
-    remove_media_url(background)
-
-
-@app.route("/api/group/<group_id>/leave", methods=["POST"])
-@api_login
-def group_leave(group_id):
-    me = session["username"]
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or me not in g.get("members", []) or g.get("type") == "dm":
-            return _err("گروه پیدا نشد.", 404)
-        if g.get("owner") == me and len(g["members"]) > 1:
-            return _err("مالک نمی‌تواند خارج شود؛ اول مالکیت را منتقل کن یا گروه را حذف کن.", 403)
-        if len(g["members"]) <= 1:               # آخرین نفر: گروه پاک می‌شود
-            groups.pop(group_id, None)
-            write_json(GROUPS_FILE, groups)
-            _delete_group_data(group_id, g.get("avatar_url", ""), g.get("background", ""))
-            _kick_sids(me, group_id)
-            _refresh_user(me)
-            return jsonify(ok=True, deleted=True)
-        g["members"].remove(me)
-        if me in g.get("admins", []):
-            g["admins"].remove(me)
-        write_json(GROUPS_FILE, groups)
-    _kick_sids(me, group_id)
-    _refresh_user(me)
-    _group_updated(group_id, g)
-    return jsonify(ok=True)
-
-
-@app.route("/api/group/<group_id>/delete", methods=["POST"])
-@api_login
-def group_delete(group_id):
-    """فقط مالک: حذف کامل گروه و همه‌ی پیام‌ها و فایل‌هایش."""
-    me = session["username"]
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or g.get("type") == "dm" or role_of(g, me) != "owner":
-            return _err("فقط مالک گروه می‌تواند آن را حذف کند.", 403)
-        members = list(g["members"])
-        groups.pop(group_id)
-        write_json(GROUPS_FILE, groups)
-        _delete_group_data(group_id, g.get("avatar_url", ""), g.get("background", ""))
-    socketio.emit("group_deleted", {"id": group_id}, to=group_id)
-    for n in members:
-        _kick_sids(n, group_id)
-        _refresh_user(n)
-    return jsonify(ok=True)
-
-
-@app.route("/api/group/<group_id>/invite/reset", methods=["POST"])
-@api_login
-def group_invite_reset(group_id):
-    """مالک/ادمین: لینک دعوت قبلی باطل و لینک جدید ساخته می‌شود."""
-    me = session["username"]
-    with data_lock:
-        groups = read_json(GROUPS_FILE, {})
-        g = groups.get(group_id)
-        if not g or not is_admin(g, me):
-            return _err("اجازه نداری.", 403)
-        g["invite_code"] = secrets.token_urlsafe(12)
-        write_json(GROUPS_FILE, groups)
-    return jsonify(ok=True, invite_url=request.url_root.rstrip("/") + "/join/" + g["invite_code"])
-
-
-# ---------- realtime ----------
-def valid_group(username, gid):
-    g = read_json(GROUPS_FILE, {}).get(gid)
-    return g if g and is_member(g, username) else None
-
-
-@socketio.on("connect")
-def on_connect(auth=None):
-    username = session.get("username")
-    if not username or username not in read_json(USERS_FILE, {}):
-        return False
-    online_sids[request.sid] = username
-    join_room("user:" + username)
-    try:
-        onboard_bot_chat(username)          # هر حساب (حتی قدیمی) چت خصوصی با دستیار را دارد
-    except Exception as e:
-        print("[bot] onboarding failed:", repr(e))
-    groups = my_groups(username)
-    for gid in groups:
-        join_room(gid)
-    emit("groups_snapshot", {"groups": groups})
-    broadcast_presence()
-
-
-@socketio.on("disconnect")
-def on_disconnect():
-    online_sids.pop(request.sid, None)
-    recent_sends.pop(request.sid, None)
-    broadcast_presence()
-
-
-@socketio.on("sync")
-def on_sync(data):
-    username = session.get("username")
-    if not username:
-        return
-    last_read = (data or {}).get("last_read") or {}
-    asked = [(gid, last_read[gid]) for gid in my_groups(username) if isinstance(last_read.get(gid), int)]
-    counts = {gid: 0 for gid, _ in asked}
-    if asked:
-        rows = q("SELECT group_id, COUNT(*) c FROM messages WHERE username!=? AND (" + " OR ".join(["(group_id=? AND seq>?)"] * len(asked))
-                 + ") GROUP BY group_id", (username,) + tuple(v for pair in asked for v in pair))
-        counts.update({r["group_id"]: r["c"] for r in rows})
-    emit("unread", {"counts": counts})
-
-
-@socketio.on("select_group")
-def on_select_group(data):
-    username = session.get("username")
-    gid = str((data or {}).get("group_id", "general"))
-    g = valid_group(username, gid) if username else None
-    if not g:
-        return
-    join_room(gid)
-    msgs, more = fetch_page(gid)
-    emit("group_history", {"group_id": gid, "messages": msgs, "has_more": more, "group": public_group(g)})
-
-
-@socketio.on("load_older")
-def on_load_older(data):
-    username = session.get("username")
-    data = data or {}
-    gid = str(data.get("group_id", ""))
-    before = data.get("before")
-    if not username or not valid_group(username, gid) or not isinstance(before, int):
-        return
-    msgs, more = fetch_page(gid, before=before)
-    emit("older_messages", {"group_id": gid, "messages": msgs, "has_more": more})
-
-
-sent_cids = {}   # (username, client id) -> (message, time): makes retries idempotent (no duplicate messages)
-
-
-def deliver_message(username, gid, text, reply_to="", cid="", attach=None, forwarded_from=""):
-    """Single code path for sending (Socket.IO, HTTP fallback and file upload). Returns (message, error)."""
-    text, cid = str(text or "").strip()[:1000], str(cid or "")[:40]
-    g = valid_group(username, gid) if username else None
-    if not g or (not text and not attach):
-        return None, "ارسال پیام ممکن نیست."
-    if g.get("type") != "dm" and g.get("only_admins_post") and not is_admin(g, username) and username != BOT_USER:
-        return None, "در این گروه فقط مالک و ادمین‌ها می‌توانند پیام بفرستند."
-    if g.get("type") == "dm" and username != BOT_USER and BOT_USER not in g.get("members", []):
-        _users = read_json(USERS_FILE, {})
-        _other = next((n for n in g.get("members", []) if n != username), None)
-        if _other and (is_blocked(_users, _other, username) or is_blocked(_users, username, _other)):
-            return None, "امکان ارسال پیام در این گفتگو وجود ندارد (مسدود شده)."
-        if _other and not q("SELECT 1 FROM messages WHERE group_id=? AND username=? LIMIT 1", (gid, _other), one=True):
-            _mode = _dm_mode(_users.get(_other) or {})      # the other person never wrote here: first-contact rule
-            if _mode == "nobody" or (_mode == "contacts" and username not in ((_users.get(_other) or {}).get("contacts") or {})):
-                return None, "این کاربر پیام خصوصی از تو نمی‌پذیرد."
-    if text:
-        text, serr = normalize_special(text)
-        if serr:
-            return None, serr
-    hit = sent_cids.get((username, cid)) if cid else None
-    if hit:
-        return hit[0], ""
-    if not rate_ok("send:" + username, 20, 10):
-        return None, "کمی آهسته‌تر؛ پیام‌ها پشت‌سرهم ارسال می‌شوند."
-    reply_to = str(reply_to or "")[:50]
-    if reply_to and not q("SELECT 1 FROM messages WHERE id=? AND group_id=?", (reply_to, gid), one=True):
-        reply_to = ""
-    m = insert_message(gid, username, text, reply_to=reply_to, forwarded_from=forwarded_from, attach=attach or "")
-    m["cid"] = cid
-    if cid:
-        now = time.time()
-        if len(sent_cids) > 3000:
-            for k in [k for k, v in sent_cids.items() if now - v[1] > 600]:
-                sent_cids.pop(k, None)
-        sent_cids[(username, cid)] = (m, now)
-    if g.get("type") == "dm" and len(q("SELECT 1 FROM messages WHERE group_id=? LIMIT 2", (gid,))) == 1:
-        for n in g["members"]:  # first message: the DM now appears in the other person's list
-            socketio.emit("groups_snapshot", {"groups": my_groups(n), "users": visible_users(n)}, to="user:" + n)
-    socketio.emit("new_message", m, to=gid)
-    if g.get("type") == "dm" and BOT_USER in g.get("members", []) and username != BOT_USER and text:
-        threading.Timer(0.6, bot_respond, (gid, text)).start()
-    return m, ""
-
-
-@socketio.on("send_message")
-def on_send_message(data):
-    data = data or {}
-    m, err = deliver_message(session.get("username"), str(data.get("group_id", "")), data.get("text", ""),
-                             data.get("reply_to", ""), data.get("cid", ""))
-    return {"ok": True, "id": m["id"], "message": m} if m else {"ok": False, "error": err}
-
-
-@app.route("/api/messages", methods=["GET", "POST"])
-@api_login
-def api_messages():
-    """HTTP fallback: works even when WebSocket / long-polling is blocked by the network."""
-    username = session["username"]
-    if request.method == "POST":
-        p = request.get_json(silent=True) or {}
-        m, err = deliver_message(username, str(p.get("group_id", "")), p.get("text", ""), p.get("reply_to", ""), p.get("cid", ""))
-        return (jsonify(ok=True, id=m["id"], message=m), 200) if m else (jsonify(ok=False, error=err), 429 if "آهسته" in err else 400)
-    gid = request.args.get("group_id", "")
-    g = valid_group(username, gid)
-    if not g:
-        return jsonify(error="گروه پیدا نشد."), 404
-    after = request.args.get("after", type=int)
-    if after is None:
-        msgs, more = fetch_page(gid)
-    else:
-        rows = q(SELECT_MSG + "WHERE m.group_id=? AND m.seq>? ORDER BY m.seq ASC LIMIT 200", (gid, after))
-        users, more = read_json(USERS_FILE, {}), False
-        msgs = [shape(r, users) for r in rows]
-        attach_reactions(msgs)
-    return jsonify(ok=True, messages=msgs, has_more=more, group=public_group(g))
-
-
-@app.route("/api/upload", methods=["POST"])
-@api_login
-def api_upload():
-    """Send a photo / video / audio / file. multipart form: file, group_id, text (caption), reply_to, cid."""
-    username = session["username"]
-    gid = str(request.form.get("group_id", ""))
-    if not valid_group(username, gid):
-        return _err("گروه پیدا نشد.", 404)
-    f = request.files.get("file")
-    if not f or not f.filename:
-        return _err("فایلی انتخاب نشده است.")
-    if not rate_ok("upload:" + username, 10, 60):
-        return _err("کمی آهسته‌تر؛ فایل‌ها پشت‌سرهم ارسال می‌شوند.", 429)
-    data = f.read(MAX_FILE_SIZE + 1)
-    if len(data) > MAX_FILE_SIZE:
-        return _err(f"حجم فایل بیشتر از {MAX_FILE_MB} مگابایت است.", 413)
-    if not data:
-        return _err("فایل خالی است.")
-    name = clean_filename(f.filename)
-    ext = file_ext(name)
-    if ext in BLOCKED_EXT:
-        return _err("ارسال این نوع فایل مجاز نیست.")
-    kind = "image" if ext in IMAGE_MIME else "audio" if ext in AUDIO_MIME else "video" if ext in VIDEO_MIME else "file"
-    if kind == "image" and not looks_like_image(data[:16]):
-        return _err("فایل تصویر معتبر نیست.")
-    mime = INLINE_MIME.get(ext) or mimetypes.guess_type(name)[0] or "application/octet-stream"
-    stored = uuid.uuid4().hex + ext
-    store_media(stored, mime, data)
-    attach = {"file": stored, "name": name, "mime": mime, "size": len(data), "kind": kind,
-              "url": "/media/" + stored + "?n=" + urllib.parse.quote(name)}
-    m, err = deliver_message(username, gid, request.form.get("text", ""), request.form.get("reply_to", ""),
-                             request.form.get("cid", ""), attach=json.dumps(attach, ensure_ascii=False))
-    if not m:
-        cleanup_media([stored])
-        return _err(err, 429 if "آهسته" in err else 400)
-    if (m.get("attach") or {}).get("file") != stored:      # a retry with the same cid: the first copy already exists
-        cleanup_media([stored])
-    return jsonify(ok=True, id=m["id"], message=m)
-
-
-# ---------- reactions (one reaction per person per message, like Telegram) ----------
-MSG_ID_RE = re.compile(r"[0-9a-f]{32}")
-
-
-def valid_emoji(e):
-    return 0 < len(e) <= 16 and all(ord(ch) > 0x7f for ch in e)
-
-
-def attach_reactions(msgs):
-    """Fills m["reactions"] for a list of shaped messages with one query per 300 ids."""
-    ids = [m["id"] for m in msgs if m.get("id") and MSG_ID_RE.fullmatch(m["id"])]
-    for i in range(0, len(ids), 300):
-        part = reactions_for(ids[i:i + 300])
-        for m in msgs:
-            if m.get("id") in part:
-                m["reactions"] = part[m["id"]]
-    return msgs
-
-
-def reactions_for(ids):
-    out = {i: [] for i in ids}
-    if not ids:
-        return out
-    rows = q("SELECT message_id, emoji, username FROM reactions WHERE message_id IN (" + ",".join("?" * len(ids))
-             + ") ORDER BY created_at", tuple(ids))
-    tmp = {}
-    for r in rows:
-        tmp.setdefault(r["message_id"], {}).setdefault(r["emoji"], []).append(r["username"])
-    for mid, per in tmp.items():
-        out[mid] = [{"emoji": em, "users": us} for em, us in sorted(per.items(), key=lambda kv: -len(kv[1]))]
-    return out
-
-
-@app.route("/api/reactions")
-@api_login
-def api_reactions():
-    username = session["username"]
-    ids = [i for i in request.args.get("ids", "").split(",") if MSG_ID_RE.fullmatch(i)][:200]
-    if not ids:
-        return jsonify(ok=True, reactions={})
-    rows = q("SELECT id, group_id, text FROM messages WHERE id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids))
-    groups = read_json(GROUPS_FILE, {})
-    rows = [r for r in rows if groups.get(r["group_id"]) and is_member(groups[r["group_id"]], username)]
-    allowed = [r["id"] for r in rows]
-    texts = {r["id"]: r["text"] for r in rows if r["text"] and not SPECIAL_RE.match(r["text"])}
-    return jsonify(ok=True, reactions=reactions_for(allowed), texts=texts)
-
-
-@app.route("/api/react", methods=["POST"])
-@api_login
-def api_react():
-    """Toggle / change my reaction on a message. json: {id, emoji}. Same emoji again (or empty emoji) removes it."""
-    username = session["username"]
-    p = request.get_json(silent=True) or {}
-    mid, emoji = str(p.get("id", "")), str(p.get("emoji", "")).strip()
-    if not MSG_ID_RE.fullmatch(mid) or (emoji and not valid_emoji(emoji)):
-        return _err("واکنش نامعتبر است.")
-    row = q("SELECT group_id FROM messages WHERE id=?", (mid,), one=True)
-    g = valid_group(username, row["group_id"]) if row else None
-    if not g:
-        return _err("پیام پیدا نشد.", 404)
-    if not rate_ok("react:" + username, 40, 10):
-        return _err("کمی آهسته‌تر.", 429)
-    cur = q("SELECT emoji FROM reactions WHERE message_id=? AND username=?", (mid, username), one=True)
-    if not emoji or (cur and cur["emoji"] == emoji):
-        q("DELETE FROM reactions WHERE message_id=? AND username=?", (mid, username), commit=True)
-    else:
-        q("INSERT INTO reactions(message_id,username,emoji,created_at) VALUES(?,?,?,?) "
-          "ON CONFLICT(message_id,username) DO UPDATE SET emoji=excluded.emoji, created_at=excluded.created_at",
-          (mid, username, emoji, datetime.now(timezone.utc).isoformat()), commit=True)
-    data = reactions_for([mid])[mid]
-    socketio.emit("reaction_update", {"id": mid, "group_id": row["group_id"], "reactions": data}, to=row["group_id"])
-    return jsonify(ok=True, id=mid, reactions=data)
-
-
-# ---------- polls ----------
-def poll_votes_for(ids):
-    out = {i: [] for i in ids}
-    if ids:
-        for r in q("SELECT message_id, username, opt FROM poll_votes WHERE message_id IN (" + ",".join("?" * len(ids)) + ")", tuple(ids)):
-            out[r["message_id"]].append([r["username"], r["opt"]])
-    return out
-
-
-@app.route("/api/polls")
-@api_login
-def api_polls():
-    username = session["username"]
-    ids = [i for i in request.args.get("ids", "").split(",") if MSG_ID_RE.fullmatch(i)][:200]
-    if not ids:
-        return jsonify(ok=True, polls={})
-    placeholders = ",".join("?" for _ in ids)
-    rows = q("SELECT id, group_id FROM messages WHERE id IN (" + placeholders + ")", tuple(ids))
-    groups = read_json(GROUPS_FILE, {})
-    rows = [r for r in rows if groups.get(r["group_id"]) and is_member(groups[r["group_id"]], username)]
-    allowed = [r["id"] for r in rows]
-    return jsonify(ok=True, polls=poll_votes_for(allowed))
-
-
-import insta
-insta.register(globals())
+            return jsonify(error="فقط مالک یا ادمین گرو
