@@ -190,6 +190,14 @@
     }
   });
 
+  /* ---------- typing in a field clears that field's old error ---------- */
+  document.addEventListener("input", function (e) {
+    var t = e && e.target;
+    if (!t || t.tagName !== "INPUT" || !t.id) return;
+    if (t.getAttribute("aria-invalid") === "true") setErr(t.id, "");
+    if (t.id === "su-pw" || t.id === "su-pw2") { var o = $(t.id === "su-pw" ? "su-pw2" : "su-pw"); if (o && o.getAttribute("aria-invalid") === "true" && val("su-pw", true) === val("su-pw2", true)) setErr(o.id, ""); }
+  });
+
   /* ---------- wipe: remove everything the person typed ---------- */
   function wipeAll() {
     [el.formLogin, el.formSignup, el.formCode].forEach(function (f) {
