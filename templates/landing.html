@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f0d1c">
+<title>ورود | چت‌روم و اینستا</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='solid3d.css') }}?v={{ ASSET_V }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}?v={{ ASSET_V }}">
+<noscript><style>.s3d{display:none}</style></noscript>
+</head>
+<body class="lp">
+<main class="lp-wrap" id="main">
+  <header class="lp-head">
+    <h1>از کدوم در وارد می‌شی؟</h1>
+    <p>هر بخش حساب جداگانه‌ی خودش را دارد. یکی را انتخاب کن.</p>
+  </header>
+
+  <nav class="lp-doors" id="doors" aria-label="انتخاب بخش">
+    <a class="lp-door" data-section="chat" href="{{ url_for('chat') if chat_in else url_for('auth_page', section='chat') }}">
+      <span class="lp-stage"><span class="s3d" data-shape="chat" aria-hidden="true"></span><span class="lp-floor" aria-hidden="true"></span></span>
+      <span class="lp-name">چت‌روم</span>
+      <span class="lp-desc">گفتگوی خصوصی و گروهی با دوستانت</span>
+      <span class="lp-go">{{ 'ادامه با حساب فعلی' if chat_in else 'ورود یا ساخت حساب' }}</span>
+    </a>
+    <a class="lp-door" data-section="insta" href="{{ '/insta' if insta_in else url_for('auth_page', section='insta') }}">
+      <span class="lp-stage"><span class="s3d" data-shape="insta" aria-hidden="true"></span><span class="lp-floor" aria-hidden="true"></span></span>
+      <span class="lp-name">اینستا</span>
+      <span class="lp-desc">پست، ریلز و استوری، همراه با پیام مستقیم</span>
+      <span class="lp-go">{{ 'ادامه با حساب فعلی' if insta_in else 'ورود یا ساخت حساب' }}</span>
+    </a>
+  </nav>
+</main>
+<script src="{{ url_for('static', filename='solid3d.js') }}?v={{ ASSET_V }}"></script>
+<script src="{{ url_for('static', filename='landing.js') }}?v={{ ASSET_V }}"></script>
+</body>
+</html>
