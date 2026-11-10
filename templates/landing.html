@@ -10,6 +10,9 @@
 <noscript><style>.s3d{display:none}</style></noscript>
 </head>
 <body class="lp">
+<div class="lp-bg" aria-hidden="true">
+  {% for i in range(18) %}<i style="--x:{{ (i * 37 + 8) % 96 }}%;--s:{{ 22 + (i * 23) % 74 }}px;--d:{{ 15 + (i * 5) % 13 }}s;--w:{{ -((i * 7) % 22) }}s;--k:{{ i % 3 }}"></i>{% endfor %}
+</div>
 <main class="lp-wrap" id="main">
   <header class="lp-head">
     <h1>از کدوم در وارد می‌شی؟</h1>
